@@ -1,0 +1,3234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎵 MelodyForge — Criador de Melodias</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: #0f1117;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    /* Piano Keys */
+    .piano-wrap {
+      overflow-x: auto;
+      padding: 12px 16px;
+      background: #1a1d2e;
+      border-radius: 12px;
+    }
+    .piano {
+      display: flex;
+      position: relative;
+      height: 110px;
+      user-select: none;
+    }
+    .key-white {
+      width: 36px;
+      height: 110px;
+      background: linear-gradient(to bottom, #f0f0f0, #ffffff);
+      border: 1px solid #aaa;
+      border-radius: 0 0 6px 6px;
+      cursor: pointer;
+      position: relative;
+      z-index: 1;
+      transition: background 0.08s;
+      flex-shrink: 0;
+    }
+    .key-white:hover { background: #d4e8ff; }
+    .key-white.active { background: #60a5fa; }
+    .key-white.in-scale { background: linear-gradient(to bottom, #bfdbfe, #dbeafe); }
+    .key-white.in-scale:hover { background: #93c5fd; }
+    .key-white.in-scale.active { background: #3b82f6; }
+    .key-white.root { background: linear-gradient(to bottom, #fde68a, #fef3c7); }
+    .key-white.root:hover { background: #fbbf24; }
+    .key-white.root.active { background: #f59e0b; }
+    .key-black {
+      width: 22px;
+      height: 68px;
+      background: linear-gradient(to bottom, #2d2d2d, #111);
+      border-radius: 0 0 5px 5px;
+      cursor: pointer;
+      position: absolute;
+      z-index: 2;
+      transition: background 0.08s;
+      border: 1px solid #000;
+    }
+    .key-black:hover { background: linear-gradient(to bottom, #4a4a4a, #222); }
+    .key-black.active { background: linear-gradient(to bottom, #2563eb, #1d4ed8); }
+    .key-black.in-scale { background: linear-gradient(to bottom, #1e40af, #1e3a8a); }
+    .key-black.in-scale:hover { background: linear-gradient(to bottom, #2563eb, #1d4ed8); }
+
+    /* Keyboard shortcut labels on piano keys */
+    .key-label {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      text-transform: uppercase;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .key-black .key-label { bottom: 5px; color: #cbd5e1; }
+    .key-white.active .key-label { color: #1e3a8a; }
+    .key-black.active .key-label { color: #93c5fd; }
+
+    /* Shortcut key badges */
+    kbd {
+      display: inline-block;
+      min-width: 20px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: #1e2235;
+      border: 1px solid #334155;
+      border-bottom-width: 2px;
+      color: #e2e8f0;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .shortcut-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      background: #0f1420;
+      border: 1px solid #1e2a3a;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+
+    /* Step Sequencer */
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--step-columns, 16), 1fr);
+      gap: 3px;
+    }
+    .step-cell {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: transparent;
+      background: #1e2235;
+    }
+    .step-cell:hover { border-color: #60a5fa; background: #1e3a5f; }
+    .step-cell.on {
+      background: #3b82f6;
+      color: #fff;
+      border-color: #60a5fa;
+    }
+    .step-cell.on.beat1 { background: #f59e0b; border-color: #fbbf24; }
+    .step-cell.on.beat3 { background: #8b5cf6; border-color: #a78bfa; }
+    .step-cell.barStart { border-left-color: #94a3b8; }
+    .arr-cell.barStart { border-left-color: #64748b; }
+    .step-cell.playing { border-color: #f0f9ff !important; box-shadow: 0 0 8px #60a5fa; }
+    .step-cell.cursor { border-color: #34d399 !important; }
+
+    /* Full arrangement grid */
+    .arr-row { display: flex; align-items: center; gap: 6px; }
+    .arr-label {
+      width: 64px;
+      flex-shrink: 0;
+      font-size: 11px;
+      color: #94a3b8;
+      text-align: right;
+    }
+    .arr-cells {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(var(--step-columns, 16), 1fr);
+      gap: 3px;
+    }
+    .arr-cell {
+      height: 26px;
+      border-radius: 4px;
+      background: #1e2235;
+      border: 1px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: transparent;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .arr-cell.on { color: #fff; }
+    .arr-cell.chord { background: #4c1d95; border-color: #8b5cf6; }
+    .arr-cell.bass  { background: #065f46; border-color: #10b981; }
+    .arr-cell.kick  { background: #991b1b; border-color: #ef4444; }
+    .arr-cell.snare { background: #9a3412; border-color: #f97316; }
+    .arr-cell.hat   { background: #854d0e; border-color: #facc15; }
+    .arr-cell.melody{ background: #1e3a5f; border-color: #60a5fa; }
+    .arr-cell.playing { box-shadow: 0 0 8px #f0f9ff; border-color: #f0f9ff !important; }
+
+    /* Song form (versos / refrão) */
+    .section-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 999px; cursor: pointer;
+      font-size: 11px; font-weight: 700; white-space: nowrap;
+      background: #1e2235; border: 1px solid #334155; color: #94a3b8;
+      transition: all .15s ease;
+    }
+    .section-chip.verse  { border-color: #3b82f6; color: #93c5fd; }
+    .section-chip.chorus { border-color: #a855f7; color: #d8b4fe; background: #3b1d5e; }
+    .section-chip.bridge { border-color: #f59e0b; color: #fcd34d; }
+    .section-chip.active { box-shadow: 0 0 10px currentColor; border-color: #f0f9ff; color: #fff; }
+    .section-chip:hover { filter: brightness(1.25); }
+
+    /* Melodic contour canvas */
+    #contourCanvas {
+      border-radius: 8px;
+      background: #1a1d2e;
+    }
+
+    /* Tabs */
+    .tab-btn {
+      padding: 6px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      transition: all 0.15s;
+    }
+    .tab-btn.active {
+      background: #3b82f6;
+      color: white;
+    }
+    .tab-btn:hover:not(.active) { background: #1e2a3a; color: #e2e8f0; }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-success { background: #10b981; color: white; }
+    .btn-success:hover { background: #059669; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-outline {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid #334155;
+    }
+    .btn-outline:hover { background: #1e2a3a; color: #e2e8f0; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Sliders */
+    input[type=range] {
+      accent-color: #3b82f6;
+      cursor: pointer;
+    }
+
+    /* Select */
+    select {
+      background: #1e2235;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+    select:hover { border-color: #60a5fa; }
+    select option { background: #1e2235; }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-blue { background: #1e3a5f; color: #60a5fa; }
+    .badge-green { background: #064e3b; color: #34d399; }
+    .badge-yellow { background: #451a03; color: #fbbf24; }
+    .badge-purple { background: #2e1065; color: #a78bfa; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f1117; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    /* Note pill in sequence display */
+    .note-pill {
+      display: inline-block;
+      min-width: 28px;
+      padding: 2px 5px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      background: #1e3a5f;
+      color: #60a5fa;
+      margin: 1px;
+    }
+    .note-pill.rest { background: #1e2235; color: #475569; }
+
+    /* Theory card */
+    .theory-card {
+      background: #131929;
+      border: 1px solid #1e2a3a;
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .theory-card h4 { margin: 0 0 8px 0; font-size: 13px; color: #60a5fa; }
+    .theory-card p { margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.6; }
+
+    /* Animation */
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(96,165,250,0.4); }
+      70% { box-shadow: 0 0 0 8px rgba(96,165,250,0); }
+      100% { box-shadow: 0 0 0 0 rgba(96,165,250,0); }
+    }
+    .btn-primary.playing { animation: pulse-ring 1.2s infinite; }
+
+    .section-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==================== APP ==================== -->
+<div class="max-w-5xl mx-auto px-4 py-6">
+
+  <!-- HEADER -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-white m-0">🎵 MelodyForge</h1>
+      <p class="text-sm text-slate-400 mt-1">Criador de Melodias Originais · Baseado em Teoria Musical</p>
+    </div>
+    <div class="flex flex-wrap gap-2 justify-end">
+      <button id="btnPlay" class="btn btn-success" onclick="togglePlay()">▶ Play</button>
+      <button class="btn btn-secondary" onclick="clearSequencer()">✕ Limpar</button>
+      <button class="btn btn-primary" onclick="generateMelody()">✨ Gerar Melodia</button>
+      <button class="btn btn-outline" onclick="toggleShortcuts()">⌨ Atalhos</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="flex gap-1 mb-5 bg-[#131929] p-1 rounded-xl w-fit">
+    <button class="tab-btn active" onclick="switchTab(this,'compose')">🎹 Compor</button>
+    <button class="tab-btn" onclick="switchTab(this,'theory')">📚 Teoria</button>
+    <button class="tab-btn" onclick="switchTab(this,'rhythm')">🥁 Ritmo</button>
+    <button class="tab-btn" onclick="switchTab(this,'export')">💾 Exportar</button>
+  </div>
+
+  <!-- ======= ATALHOS DE TECLADO ======= -->
+  <div id="shortcutsPanel" class="hidden bg-[#131929] border border-[#1e2a3a] rounded-xl p-4 mb-5">
+    <div class="flex items-center justify-between mb-3">
+      <span class="section-label">⌨ Atalhos de Teclado</span>
+      <button class="btn btn-outline text-xs py-1 px-2" onclick="toggleShortcuts()">✕ Fechar</button>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+      <div class="shortcut-row"><kbd>Espaço</kbd> ▶ Play / ⏹ Stop</div>
+      <div class="shortcut-row"><kbd>N</kbd> ✨ Nova melodia</div>
+      <div class="shortcut-row"><kbd>L</kbd> ✕ Limpar sequência</div>
+      <div class="shortcut-row"><kbd>R</kbd> 🎲 Ritmo aleatório</div>
+      <div class="shortcut-row"><kbd>C</kbd> 📈 Aplicar contorno</div>
+      <div class="shortcut-row"><kbd>M</kbd> 🎼 Criar música completa</div>
+      <div class="shortcut-row"><kbd>V</kbd> 🔀 Novas variações das estrofes</div>
+      <div class="shortcut-row"><kbd>B</kbd> 🎤 Alternar estilo vocal (livre / cantável / muito fácil)</div>
+      <div class="shortcut-row"><kbd>X</kbd> 🔗 Combinar / variar os compassos da frase</div>
+      <div class="shortcut-row"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> Trocar de aba</div>
+      <div class="shortcut-row"><kbd>?</kbd> Mostrar/ocultar esta ajuda</div>
+      <div class="shortcut-row"><kbd>[</kbd> <kbd>]</kbd> Instrumento anterior / próximo</div>
+    </div>
+    <div class="mt-4">
+      <span class="section-label">🎹 Tocar piano com o teclado</span>
+      <div class="text-xs text-slate-400 mt-2 leading-relaxed">
+        As letras aparecem impressas nas teclas do piano. Use
+        <kbd>A</kbd><kbd>W</kbd><kbd>S</kbd><kbd>E</kbd><kbd>D</kbd><kbd>F</kbd><kbd>T</kbd><kbd>G</kbd><kbd>Y</kbd><kbd>H</kbd><kbd>U</kbd><kbd>J</kbd><kbd>K</kbd>
+        para tocar C3 → C4. Segure <kbd>Shift</kbd> junto com a tecla para tocar uma oitava acima.
+        A tecla <kbd>Espaço</kbd> funciona mesmo com o piano focado.
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= TAB: COMPOR ======= -->
+  <div id="tab-compose">
+
+    <!-- ROW: Instrumento -->
+    <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4 mb-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div class="section-label mb-1">🎻 Instrumento</div>
+          <div id="instrumentInfo" class="text-xs text-slate-500">Teclados · Piano</div>
+          <div id="sampleStatus" class="text-xs text-slate-500 mt-1"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-500 hidden sm:inline">Use <kbd>[</kbd> <kbd>]</kbd> para alternar</span>
+          <select id="instrumentSelect" onchange="updateInstrument()" class="min-w-56"></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: Controls -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+
+      <!-- Tonalidade -->
+      <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+        <div class="section-label mb-2">Tonalidade (Root)</div>
+        <select id="rootNote" onchange="updateScale()" class="w-full">
+          <option value="C">C (Dó)</option>
+          <option value="C#">C# / Db (Dó#)</option>
+          <option value="D">D (Ré)</option>
+          <option value="D#">D# / Eb (Ré#)</option>
+          <option value="E">E (Mi)</option>
+          <option value="F">F (Fá)</option>
+          <option value="F#">F# / Gb (Fá#)</option>
+          <option value="G">G (Sol)</option>
+          <option value="G#">G# / Ab (Sol#)</option>
+          <option value="A">A (Lá)</option>
+          <option value="A#">A# / Bb (Lá#)</option>
+          <option value="B">B (Si)</option>
+        </select>
+      </div>
+
+      <!-- Escala -->
+      <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+        <div class="section-label mb-2">Escala / Modo</div>
+        <select id="scaleType" onchange="updateScale()" class="w-full">
+          <optgroup label="Escalas Principais">
+            <option value="major">Major (Maior) ☀️</option>
+            <option value="minor">Minor (Menor) 🌙</option>
+            <option value="harmonic_minor">Menor Harmônica 🎻</option>
+            <option value="melodic_minor">Menor Melódica 🎷</option>
+          </optgroup>
+          <optgroup label="Modos Gregos">
+            <option value="dorian">Dorian 🎺</option>
+            <option value="phrygian">Phrygian 🌶️</option>
+            <option value="lydian">Lydian 🌟</option>
+            <option value="mixolydian">Mixolydian 🎸</option>
+            <option value="locrian">Locrian 🕯️</option>
+          </optgroup>
+          <optgroup label="Especiais">
+            <option value="pentatonic_major">Pentatônica Maior 🎵</option>
+            <option value="pentatonic_minor">Pentatônica Menor 🎵</option>
+            <option value="blues">Blues 🎸</option>
+            <option value="whole_tone">Tom Inteiro 🌊</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- Tempo -->
+      <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+        <div class="section-label mb-2">Tempo — <span id="bpmDisplay">120</span> BPM</div>
+        <input type="range" id="bpmSlider" min="40" max="240" value="120" class="w-full" oninput="updateBPM(this.value)">
+        <div class="flex justify-between text-xs text-slate-500 mt-1">
+          <span>Lento 40</span><span>Rápido 240</span>
+        </div>
+      </div>
+
+      <!-- Compasso -->
+      <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+        <div class="section-label mb-2">Compasso</div>
+        <select id="timeSignature" onchange="updateTimeSig()" class="w-full">
+          <option value="4">4/4 (Pop/Rock)</option>
+          <option value="3">3/4 (Valsa)</option>
+          <option value="2">2/4 (Marcha)</option>
+          <option value="6">6/8 (Balada)</option>
+          <option value="5">5/4 (Progressivo)</option>
+          <option value="7">7/8 (Irregular)</option>
+        </select>
+        <div id="timeSigInfo" class="text-xs text-slate-500 mt-1">Forte-fraco-médio-fraco</div>
+      </div>
+
+    </div>
+
+    <!-- ROW: Scale info + Piano -->
+    <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4 mb-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <span class="section-label">Teclado — Notas da Escala</span>
+          <div id="scaleNotesDisplay" class="flex flex-wrap gap-1 mt-2"></div>
+        </div>
+        <div>
+          <span id="scaleEmotionBadge" class="badge badge-blue">Major: Alegre, estável</span>
+        </div>
+      </div>
+      <div class="piano-wrap">
+        <div class="piano" id="piano"></div>
+      </div>
+      <div class="flex gap-4 mt-2 text-xs text-slate-500">
+        <span class="flex items-center gap-1"><span style="width:12px;height:12px;background:#fef3c7;border-radius:2px;display:inline-block;border:1px solid #d97706"></span> Tônica (raiz)</span>
+        <span class="flex items-center gap-1"><span style="width:12px;height:12px;background:#dbeafe;border-radius:2px;display:inline-block;border:1px solid #3b82f6"></span> Na escala</span>
+        <span class="flex items-center gap-1"><span style="width:12px;height:12px;background:#f8fafc;border-radius:2px;display:inline-block;border:1px solid #aaa"></span> Fora da escala</span>
+      </div>
+    </div>
+
+    <!-- SEQUENCER -->
+    <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4 mb-5">
+      <div class="flex items-center justify-between mb-3">
+        <span class="section-label" id="sequencerTitle">Sequenciador de Melodia (64 Passos · 4 compassos)</span>
+        <div class="flex flex-wrap gap-2">
+          <label class="text-xs text-slate-400 flex items-center gap-2" title="Quantos compassos formam a frase musical">
+            Frase:
+            <select id="phraseLength" class="text-xs py-1" onchange="changePhraseLength()">
+              <option value="16">16 · 1 compasso (motivo)</option>
+              <option value="32">32 · 2 compassos</option>
+              <option value="64" selected>64 · 4 compassos</option>
+              <option value="128">128 · 8 compassos</option>
+            </select>
+          </label>
+          <label class="text-xs text-slate-400 flex items-center gap-2">
+            Oitava:
+            <select id="octaveSelect" class="text-xs py-1" onchange="updateScale()">
+              <option value="3">3</option>
+              <option value="4" selected>4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </label>
+          <label class="text-xs text-slate-400 flex items-center gap-2" title="Controla o quanto a melodia gerada favorece o canto">
+            Voz:
+            <select id="vocalStyle" class="text-xs py-1" onchange="changeVocalStyle()">
+              <option value="free">Livre (padrão)</option>
+              <option value="easy">🎤 Fácil de cantar</option>
+              <option value="veryEasy">🎤 Muito fácil</option>
+            </select>
+          </label>
+          <button class="btn btn-outline text-xs py-1 px-3" onclick="randomizeRhythm()">🎲 Ritmo Aleat.</button>
+          <button class="btn btn-outline text-xs py-1 px-3" onclick="applyContour()">📈 Contorno</button>
+          <button class="btn btn-outline text-xs py-1 px-3" onclick="combineMelody()" title="Reagrupa os compassos da frase usando repetição e variação (tecla X)">🔗 Combinar / variar</button>
+        </div>
+      </div>
+      <div id="vocalHint" class="text-xs text-slate-500 mb-2"></div>
+
+      <!-- Note rows -->
+      <div id="sequencerGrid" class="space-y-1"></div>
+
+      <!-- Step indicators -->
+      <div class="mt-2" style="padding-left:44px;"><!-- 40px (rótulo w-10) + 4px (gap-1) = mesmo recuo das linhas de pads -->
+        <div id="stepIndicators" style="display:grid;grid-template-columns:repeat(var(--step-columns,16),1fr);gap:3px;"></div>
+      </div>
+    </div>
+
+    <!-- ARRANJO COMPLETO -->
+    <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4 mb-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span class="section-label">🎼 Música Completa</span>
+          <div class="text-xs text-slate-500 mt-1">Transforma a melodia numa música com <b>strofes</b> e <b>refrão</b>, com acordes, baixo e bateria. A melodia gerada vira o tema do refrão.</div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="text-xs text-slate-400 flex items-center gap-2">
+            Forma:
+            <select id="songForm" class="text-xs py-1" onchange="changeSongForm()">
+              <option value="simple">Simples · V–R–V–R</option>
+              <option value="pop" selected>Pop · V–R–V–R–P–R</option>
+              <option value="long">Longa · V–R–V–R–V–R–R</option>
+            </select>
+          </label>
+          <label class="text-xs text-slate-400 flex items-center gap-2">
+            Estilo:
+            <select id="arrangementStyle" class="text-xs py-1" onchange="changeArrangementStyle()">
+              <option value="pop">Pop</option>
+              <option value="rock">Rock</option>
+              <option value="jazz">Jazz</option>
+              <option value="samba">Samba</option>
+              <option value="balada">Balada</option>
+            </select>
+          </label>
+          <button class="btn btn-primary" onclick="buildFullSong()">🎼 Criar Música</button>
+          <button class="btn btn-outline" onclick="regenerateVariations()">🔀 Novas Variações</button>
+          <button id="btnArrangement" class="btn btn-outline" onclick="toggleArrangement()">🎚 Música: desligada</button>
+        </div>
+        <label class="w-full text-xs text-slate-400 flex items-center gap-2 mt-1">
+          <input type="checkbox" id="autoVariations" class="accent-purple-500">
+          Renovar as variações das estrofes a cada volta do Play (o refrão fica intacto)
+        </label>
+      </div>
+      <div id="arrangementPanel" class="hidden mt-4">
+        <div class="text-xs text-slate-400 mb-2">Forma da música (clique numa seção para inspecionar):</div>
+        <div id="songFormStrip" class="flex flex-wrap gap-2 mb-3"></div>
+        <div id="sectionTitle" class="section-label mb-2"></div>
+        <div id="progressionDisplay" class="flex flex-wrap gap-1 mb-3"></div>
+        <div id="arrangementGrid" class="space-y-1"></div>
+        <div class="text-xs text-slate-500 mt-2">As estrofes são variações guardadas do tema: umas mantêm o ritmo e trocam o contorno (como <b>📈 Contorno</b>), outras mantêm as notas e trocam o ritmo (como <b>🎲 Ritmo Aleat.</b>). Use <b>🔀 Novas Variações</b> para sortear outras e guardá-las. A exportação MIDI inclui todas as seções em 4 faixas.</div>
+      </div>
+    </div>
+
+    <!-- CONTOUR + INFO -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+      <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+        <div class="section-label mb-3">Contorno Melódico</div>
+        <canvas id="contourCanvas" width="400" height="120" class="w-full"></canvas>
+        <div class="flex gap-2 mt-2 text-xs text-slate-500">
+          <span class="badge badge-blue">Arco ⌢</span>
+          <span class="badge badge-purple">Ascend. ↗</span>
+          <span class="badge badge-green">Descend. ↘</span>
+          <span class="badge badge-yellow">Ondulado ~</span>
+        </div>
+      </div>
+
+      <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+        <div class="section-label mb-3">Análise da Melodia</div>
+        <div id="melodyAnalysis" class="space-y-2 text-sm text-slate-300">
+          <p class="text-slate-500 text-xs">Adicione notas para ver a análise...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current melody display -->
+    <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+      <div class="section-label mb-2">Sequência Atual</div>
+      <div id="melodySequence" class="flex flex-wrap gap-1 min-h-8">
+        <span class="text-xs text-slate-500">Clique nas células do sequenciador ou use "Gerar Melodia"</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ======= TAB: TEORIA ======= -->
+  <div id="tab-theory" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <div class="theory-card">
+        <h4>🎼 O que é uma Melodia?</h4>
+        <p>Uma melodia é uma sequência de notas musicais ordenadas no tempo, combinando <strong>alturas</strong> (pitch) e <strong>ritmo</strong>. É a linha principal que cantamos ou memorizamos. Uma boa melodia tem forma, direção e equilíbrio entre previsibilidade e surpresa.</p>
+      </div>
+
+      <div class="theory-card">
+        <h4>🌈 Escalas e Emoções</h4>
+        <p>
+          <strong>Major:</strong> Alegre, triunfal, estável (pop, folk)<br>
+          <strong>Minor Natural:</strong> Triste, introspectivo, melancólico<br>
+          <strong>Menor Harmônica:</strong> Dramático, oriental, tenso<br>
+          <strong>Dorian:</strong> Jazz, medieval, folk (misto maior/menor)<br>
+          <strong>Lydian:</strong> Sonhador, etéreo (4ª aumentada)<br>
+          <strong>Mixolydian:</strong> Blues, rock, folk celta<br>
+          <strong>Phrygian:</strong> Flamenco, sombrio, exótico<br>
+          <strong>Pentatônica:</strong> Universal, rock, pop asiático
+        </p>
+      </div>
+
+      <div class="theory-card">
+        <h4>📏 Intervalos e Movimento</h4>
+        <p>
+          <strong>Conjunct (grau a grau):</strong> Suave, cantável, fácil de ouvir. Ex: Dó→Ré→Mi<br><br>
+          <strong>Disjunct (saltos):</strong> Drama, tensão, surpresa. Um salto grande pede resolução no sentido oposto.<br><br>
+          <strong>Regra do ouro:</strong> Alterne graus com saltos. Muito conjunct = monótono; muito disjunct = incoerente.
+        </p>
+      </div>
+
+      <div class="theory-card">
+        <h4>🧬 Motivo e Frase</h4>
+        <p>
+          <strong>Motivo:</strong> Célula rítmico-melódica de 2-5 notas. DNA da melodia.<br><br>
+          <strong>Frase:</strong> 4-8 compassos que formam uma ideia completa.<br><br>
+          <strong>Período:</strong> Duas frases: antecedente (pergunta) + consequente (resposta). A pergunta termina no 5° grau (dominante); a resposta, no 1° (tônica).
+        </p>
+      </div>
+
+      <div class="theory-card">
+        <h4>📈 Contorno Melódico</h4>
+        <p>
+          <strong>Arco ⌢:</strong> Sobe para clímax e desce — mais natural e satisfatório<br>
+          <strong>Ascendente ↗:</strong> Tensão crescente, energia, expectativa<br>
+          <strong>Descendente ↘:</strong> Resolução, finalidade, calma<br>
+          <strong>Ondulado ~:</strong> Vivo, conversa, groove<br><br>
+          Notas importantes (<em>tônica, terça, quinta</em>) geralmente caem em tempos fortes.
+        </p>
+      </div>
+
+      <div class="theory-card">
+        <h4>🔄 Técnicas de Desenvolvimento</h4>
+        <p>
+          <strong>Repetição:</strong> Repita o motivo para criar memória<br>
+          <strong>Sequência:</strong> Repita o motivo transposto (Ex: em Dó, depois em Ré)<br>
+          <strong>Aumentação:</strong> Dobre a duração das notas<br>
+          <strong>Diminuição:</strong> Corte as durações pela metade<br>
+          <strong>Inversão:</strong> Espelhe o movimento intervalar<br>
+          <strong>Retrogrado:</strong> Toque a melodia ao contrário
+        </p>
+      </div>
+
+      <div class="theory-card md:col-span-2">
+        <h4>🎯 Notas de Chord Tones vs. Non-Chord Tones</h4>
+        <p>
+          Notas de acorde (1ª, 3ª, 5ª) em tempos <strong>fortes</strong> soam resolvidas. Notas de tensão (2ª, 4ª, 6ª, 7ª) e cromatismos em tempos <strong>fracos</strong> ou na passagem entre chord tones adicionam cor e sofisticação. As tensões resolvem por grau conjunto para o chord tone mais próximo.
+          <br><br>
+          <strong>Hierarquia de graus na escala maior:</strong> Tônica (1) = repouso total · Mediante (3) = semi-repouso · Dominante (5) = tensão estável · Sensível (7) = tensão máxima → resolve para 1
+        </p>
+      </div>
+
+    </div>
+
+    <div class="theory-card md:col-span-2 mt-4">
+      <h4>⚙️ Como funciona o gerador de melodias</h4>
+      <p>
+        O botão <strong>✨ Gerar Melodia</strong> combina teoria musical com aleatoriedade controlada, em 6 etapas:
+        <br><br>
+        <strong>1. Ritmo com pulso:</strong> sortea um padrão rítmico de <strong>16 passos (um compasso)</strong> entre retos, sincopados, esparsos e euclidianos. Os 4 tempos fortes sempre recebem uma nota; as subdivisões têm 12% de chance de mudar e o compasso costuma fechar com respiro. Esse padrão é repetido nos compassos da frase escolhida no seletor <strong>Frase</strong> (16 a 128 passos).<br>
+        <strong>2. Escolhe um contorno:</strong> arco ⌢, subida ↗, descida ↘ ou ondulado ~. Ele dá a direção geral da frase — para onde a melodia "caminha".<br>
+        <strong>3. Traça o alvo:</strong> para cada nota ativa, calcula o grau desejado a partir da posição na frase dentro do contorno (no arco, sobe até o meio e desce depois).<br>
+        <strong>4. Anda por graus:</strong> em vez de pular direto para o alvo, a linha caminha principalmente de grau em grau (58% dos casos). Saltos maiores (2–3 graus) são raros e, após eles, a próxima nota sempre resolve no sentido oposto.<br>
+        <strong>5. Harmoniza e tensiona:</strong> nos tempos fortes (1, 5, 9, 13) a nota é puxada para tônica/terça/quinta do acorde. Na metade da frase, a dominante cria tensão.<br>
+        <strong>6. Resolve:</strong> a última nota vai para a tônica <em>mais próxima</em> — a grave ou a aguda — evitando aquele salto brusco no final.<br>
+        <strong>7. Repete e varia:</strong> o primeiro compasso vira o <em>tema</em> (A); os seguintes são o tema com uma ou duas notas trocadas (A′, A″) ou uma ideia contrastante com outro contorno (B), montados em formas como <strong>A–A′–B–A′</strong>. É isso que transforma um motivo numa frase. O botão <strong>🔗 Combinar / variar</strong> (ou <kbd>X</kbd>) reaplica a montagem à melodia atual — ótimo para testar combinações sem perder o material original.<br>
+        <br>
+        Com <strong>🎼 Criar Música</strong> (ou <kbd>M</kbd>), a melodia gerada vira o <strong>tema do refrão</strong> e a música ganha uma forma com <strong>strofes</strong> e <strong>refrão</strong> (com opção de ponte). Cada seção tem sua própria progressão de acordes diatônicos — <strong>cada acorde dura 8 passos (2 por compasso, 8 numa frase de 4 compassos)</strong> (I–V / I–vi / I–IV no modo maior; i–VI / i–III / i–VII no menor), para a harmonia não trocar rápido demais — além de linha de baixo e bateria conforme o estilo. As <strong>strofes</strong> são variações do tema geradas pelos mesmos mecanismos dos botões de edição: ou mantêm o ritmo do refrão e redesenham as alturas com outro <strong>contorno</strong>, ou mantêm as notas e trocam o <strong>ritmo</strong> por um padrão sorteado, ou ainda <strong>reagrupam os compassos do tema</strong> noutra forma de frase. Cada variação fica <strong>guardada</strong> na música com o nome do método (visível ao clicar na seção), sempre termina na tônica e entra no MIDI/JSON. Use <strong>🔀 Novas Variações</strong> (ou <kbd>V</kbd>) para sortear outras sem mudar o refrão, ou marque <strong>Renovar as variações a cada volta</strong> para que o Play crie e guarde novas estrofes a cada ciclo. A <strong>ponte</strong> inverte o tema e termina na dominante para puxar o refrão final. O seletor de <strong>Forma</strong> escolhe a sequência (V–R–V–R, com ponte ou versão longa). Ao dar <kbd>Espaço</kbd>, o Play percorre a música inteira seção por seção; o botão <strong>🎚 Música</strong> alterna entre a música completa e apenas a melodia. Tudo fica dentro da <strong>escala selecionada</strong>. O seletor de <strong>instrumento</strong> troca apenas o timbre (forma de onda, parciais, ataque, filtro e vibrato). Escolher <strong>🎹 Piano Real (amostrado)</strong> ativa o <strong>modo híbrido</strong>: a melodia passa a usar samples de um piano Steinway (biblioteca <code>smplr</code>, via internet) enquanto acordes, baixo e bateria continuam sintetizados — se o carregamento falhar, o piano sintetizado assume automaticamente. Para mudar só uma parte da melodia, use <strong>🎲 Ritmo Aleat.</strong> (altera as posições) ou <strong>📈 Contorno</strong> (mantém o ritmo e redesena as alturas).
+      </p>
+    </div>
+
+    <div class="theory-card md:col-span-2 mt-4">
+      <h4>🎤 Como gerar uma melodia fácil de cantar</h4>
+      <p>
+        O seletor <strong>Voz</strong>, no sequenciador (ou a tecla <kbd>B</kbd>), tem três níveis. Em <strong>Livre</strong> o gerador usa toda a escala e ritmos variados. Em <strong>Fácil de cantar</strong> a melodia passa por quatro filtros que a tornam vocalmente confortável:<br><br>
+        <strong>1. Âmbito curto:</strong> no máximo 9 semitões — um cantor amador sente-se confortável dentro de uma sexta. Em <strong>Muito fácil</strong> o limite cai para 7 semitões (uma quinta).<br>
+        <strong>2. Notas escolhidas:</strong> um subconjunto de 4–5 graus da escala (pentatônico), sem semitons agudos e sem trítono. Isso evita os intervalos mais difíceis de afinar, inclusive a 2ª aumentada da menor harmônica.<br>
+        <strong>3. Movimento e motivo:</strong> a frase começa na tônica, repete um <strong>motivo curto</strong> de 2–4 notas (o "gancho" que gruda na memória) e quase nunca salta; quando salta, a nota seguinte compensa no sentido oposto. Termina na tônica.<br>
+        <strong>4. Ritmo com respiro:</strong> as notas caem nos tempos fortes, com durações de 1–2 tempos em vez de corcheas, e o compasso fecha com pausa para respirar. Na estrofe e na ponte os mesmos limites são respeitados.<br><br>
+        Ainda ajuda cantar num tempo moderado (<strong>80–110 BPM</strong>) — o gerador não muda o BPM que você escolheu, mas o painel <strong>Análise da Melodia</strong> mostra uma nota de <strong>cantabilidade (0–100)</strong>, o âmbito e a duração média para você comparar os resultados. Trocar o nível de Voz gera na hora uma nova melodia nesse estilo.
+      </p>
+    </div>
+
+  </div>
+
+  <!-- ======= TAB: RITMO ======= -->
+  <div id="tab-rhythm" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div class="theory-card">
+        <h4>🕐 Compassos Comuns</h4>
+        <p>
+          <strong>4/4 (Common Time):</strong> <em>FORTE-fraco-médio-fraco</em> — 90% do pop/rock<br>
+          <strong>3/4 (Valsa):</strong> <em>FORTE-fraco-fraco</em> — circular, dançante<br>
+          <strong>6/8:</strong> <em>FORTE-fraco-fraco-médio-fraco-fraco</em> — sensação de 2 pulsos com subdivisão ternária<br>
+          <strong>5/4:</strong> <em>3+2 ou 2+3</em> — coxeante, tenso, progressivo<br>
+          <strong>7/8:</strong> <em>2+2+3 ou 3+2+2</em> — irregular, folk do leste europeu
+        </p>
+      </div>
+      <div class="theory-card">
+        <h4>⚡ Sincope e Groove</h4>
+        <p>
+          <strong>Síncope:</strong> Acento em tempo fraco ou no "e" (entre os tempos). Cria tensão e groove.<br><br>
+          <strong>Off-beat:</strong> Notas nas subdivisões entre os tempos fortes (ex: o "e" do 2 em 4/4).<br><br>
+          <strong>Backbeat:</strong> Ênfase nos tempos 2 e 4 (caixa da bateria no rock/pop). Define groove moderno.
+        </p>
+      </div>
+    </div>
+
+    <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4 mb-4">
+      <div class="section-label mb-3">🎲 Padrões Rítmicos Prontos</div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('straight')">■ ■ ■ ■ — Straight</button>
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('syncopated')">■ _ ■ ■ — Sincopado</button>
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('waltz')">■ _ _ ■ — Valsa</button>
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('latin')">■ _ ■ _ — Clave Latina</button>
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('dotted')">■ ■■ ■ — Swing</button>
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('sparse')">■ _ _ _ — Esparso</button>
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('dense')">■■■■■■ — Denso</button>
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('offbeat')">_ ■ _ ■ — Off-beat</button>
+        <button class="btn btn-secondary text-sm" onclick="applyRhythmPattern('euclidean53')">E(5,16) — Africano</button>
+      </div>
+    </div>
+
+    <div class="theory-card">
+      <h4>📐 Ritmos Euclidianos</h4>
+      <p>
+        O algoritmo de Björklund distribui N pulsos em M passos de forma o mais uniforme possível. Usado em música africana, flamenco e eletrônica.<br><br>
+        <strong>E(3,8):</strong> ■ _ _ ■ _ _ ■ _ — Tresillo (base da música afrocubana)<br>
+        <strong>E(5,8):</strong> ■ _ ■ _ ■ ■ _ ■ — Padrão afrocubano<br>
+        <strong>E(5,16):</strong> distribui 5 pulsos em 16 passos — padrão africano<br>
+        <strong>E(7,16):</strong> distribui 7 pulsos em 16 passos — padrão persa<br>
+        <strong>E(13,24):</strong> Ritmo quintillo (Beethoven)
+      </p>
+    </div>
+  </div>
+
+  <!-- ======= TAB: EXPORT ======= -->
+  <div id="tab-export" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+        <div class="section-label mb-3">💾 Exportar</div>
+        <div class="space-y-3">
+          <button class="btn btn-primary w-full" onclick="exportMIDI()">🎹 Exportar MIDI (.mid)</button>
+          <button class="btn btn-secondary w-full" onclick="exportJSON()">📄 Exportar JSON</button>
+          <button class="btn btn-secondary w-full" onclick="exportTablature()">📝 Ver Tablatura/Cifra</button>
+        </div>
+      </div>
+      <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4">
+        <div class="section-label mb-3">📋 Resumo da Composição</div>
+        <div id="compositionSummary" class="text-sm text-slate-300 space-y-1"></div>
+      </div>
+    </div>
+    <div class="bg-[#131929] border border-[#1e2a3a] rounded-xl p-4 mt-4">
+      <div class="section-label mb-2">📝 Tablatura / Cifra</div>
+      <pre id="tabDisplay" class="text-xs text-green-400 font-mono whitespace-pre overflow-x-auto bg-[#0a0f1a] p-3 rounded-lg min-h-16">Clique em "Ver Tablatura/Cifra" para gerar.</pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =====================================================================
+// MUSIC THEORY DATA
+// =====================================================================
+const SCALES = {
+  major:            [0,2,4,5,7,9,11],
+  minor:            [0,2,3,5,7,8,10],
+  harmonic_minor:   [0,2,3,5,7,8,11],
+  melodic_minor:    [0,2,3,5,7,9,11],
+  dorian:           [0,2,3,5,7,9,10],
+  phrygian:         [0,1,3,5,7,8,10],
+  lydian:           [0,2,4,6,7,9,11],
+  mixolydian:       [0,2,4,5,7,9,10],
+  locrian:          [0,1,3,5,6,8,10],
+  pentatonic_major: [0,2,4,7,9],
+  pentatonic_minor: [0,3,5,7,10],
+  blues:            [0,3,5,6,7,10],
+  whole_tone:       [0,2,4,6,8,10],
+};
+
+const SCALE_EMOTIONS = {
+  major:            {text:'Alegre, estável, triunfal', badge:'badge-yellow'},
+  minor:            {text:'Triste, melancólico', badge:'badge-blue'},
+  harmonic_minor:   {text:'Dramático, oriental', badge:'badge-purple'},
+  melodic_minor:    {text:'Expressivo, complexo', badge:'badge-purple'},
+  dorian:           {text:'Jazz, medieval, folk', badge:'badge-green'},
+  phrygian:         {text:'Flamenco, sombrio, exótico', badge:'badge-purple'},
+  lydian:           {text:'Sonhador, etéreo', badge:'badge-blue'},
+  mixolydian:       {text:'Blues, rock, folk celta', badge:'badge-yellow'},
+  locrian:          {text:'Tenso, instável, dissonante', badge:'badge-purple'},
+  pentatonic_major: {text:'Universal, pop, folk', badge:'badge-green'},
+  pentatonic_minor: {text:'Rock, blues, asiático', badge:'badge-blue'},
+  blues:            {text:'Blues, soul, groove', badge:'badge-green'},
+  whole_tone:       {text:'Impressionista, flutuante', badge:'badge-blue'},
+};
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+const ROOTS = {
+  'C':0,'C#':1,'D':2,'D#':3,'E':4,'F':5,'F#':6,'G':7,'G#':8,'A':9,'A#':10,'B':11
+};
+
+const TIME_SIG_INFO = {
+  '4': 'FORTE-fraco-médio-fraco',
+  '3': 'FORTE-fraco-fraco',
+  '2': 'FORTE-fraco',
+  '6': 'FORTE-fraco-fraco-médio-fraco-fraco',
+  '5': 'FORTE-fraco-fraco-médio-fraco',
+  '7': 'FORTE-fraco-médio-fraco-médio-fraco-fraco',
+};
+
+// =====================================================================
+// INSTRUMENTOS — cada timbre é definido por forma de onda, parciais,
+// envelope, filtro, vibrato e quantidade de reverb.
+// =====================================================================
+const INSTRUMENTS = {
+  piano:      { name:'Piano',              icon:'🎹', group:'Teclados',   wave:'sine',     partials:[[1,.62],[2,.16],[3,.07],[4,.03]],              attack:.004, decay:.14, sustain:.30, release:.05, detune:4, gain:.34, reverb:1.0 },
+  realPiano:  { name:'Piano Real (amostrado)', icon:'🎹', group:'Teclados', wave:'sine',  partials:[[1,.62],[2,.16],[3,.07],[4,.03]],              attack:.004, decay:.14, sustain:.30, release:.05, detune:4, gain:.34, reverb:1.0, sampled:true },
+  rhodes:     { name:'Piano Elétrico',     icon:'🎹', group:'Teclados',   wave:'sine',     partials:[[1,.60],[2,.14],[3,.10],[5,.05]],              attack:.006, decay:.35, sustain:.18, release:.12, detune:3, gain:.30, reverb:1.2 },
+  harpsichord:{ name:'Cravo',              icon:'🎼', group:'Teclados',   wave:'sawtooth', partials:[[1,.50],[2,.22],[3,.14],[4,.09],[5,.05]],       attack:.001, decay:.18, sustain:.05, release:.04, detune:2, gain:.20, reverb:.8, filter:{type:'lowpass',mul:10,Q:1} },
+  organ:      { name:'Órgão',              icon:'🎹', group:'Teclados',   wave:'sine',     partials:[[1,.50],[2,.25],[3,.12],[4,.10],[6,.06]],       attack:.02,  decay:.05, sustain:.85, release:.10, detune:0, gain:.24, reverb:.9 },
+  accordion:  { name:'Acordeão',           icon:'🪗', group:'Teclados',   wave:'sawtooth', partials:[[1,.45],[2,.20],[3,.12],[4,.08]],              attack:.03,  decay:.08, sustain:.70, release:.12, detune:6, gain:.18, reverb:.7, filter:{type:'lowpass',mul:6,Q:1} },
+
+  guitar:     { name:'Violão',             icon:'🎸', group:'Cordas',     wave:'triangle', partials:[[1,.60],[2,.20],[3,.10],[4,.05]],              attack:.003, decay:.50, sustain:.12, release:.10, detune:3, gain:.30, reverb:1.0 },
+  elecGuitar: { name:'Guitarra Elétrica',  icon:'🎸', group:'Cordas',     wave:'sawtooth', partials:[[1,.50],[2,.25],[3,.12],[4,.08]],              attack:.008, decay:.40, sustain:.35, release:.15, detune:5, gain:.18, reverb:.9, filter:{type:'lowpass',mul:5,Q:1.2} },
+  bass:       { name:'Baixo Elétrico',     icon:'🎸', group:'Cordas',     wave:'triangle', partials:[[1,.70],[2,.20],[3,.08]],                     attack:.005, decay:.30, sustain:.30, release:.08, detune:2, gain:.36, reverb:.4, octave:-1 },
+  violin:     { name:'Violino',            icon:'🎻', group:'Cordas',     wave:'sawtooth', partials:[[1,.45],[2,.25],[3,.15],[4,.10],[5,.06]],       attack:.09,  decay:.15, sustain:.70, release:.18, detune:4, gain:.16, reverb:1.1, filter:{type:'lowpass',mul:7,Q:1}, vibrato:{rate:5.5,depth:9} },
+  cello:      { name:'Violoncelo',         icon:'🎻', group:'Cordas',     wave:'sawtooth', partials:[[1,.50],[2,.24],[3,.12],[4,.07]],              attack:.12,  decay:.18, sustain:.65, release:.22, detune:3, gain:.20, reverb:1.0, filter:{type:'lowpass',mul:5,Q:1}, vibrato:{rate:4.5,depth:7} },
+
+  flute:      { name:'Flauta',             icon:'🪈', group:'Sopro',      wave:'sine',     partials:[[1,.70],[2,.12],[3,.05]],                      attack:.05,  decay:.08, sustain:.75, release:.12, detune:0, gain:.30, reverb:1.1, filter:{type:'lowpass',mul:8,Q:.7} },
+  clarinet:   { name:'Clarinete',          icon:'🎷', group:'Sopro',      wave:'square',   partials:[[1,.55],[3,.20],[5,.10],[7,.04]],              attack:.025, decay:.06, sustain:.75, release:.10, detune:0, gain:.20, reverb:1.0, filter:{type:'lowpass',mul:6,Q:.8} },
+  oboe:       { name:'Oboé',               icon:'🎷', group:'Sopro',      wave:'square',   partials:[[1,.50],[3,.25],[5,.12],[7,.06],[9,.03]],       attack:.04,  decay:.07, sustain:.80, release:.12, detune:0, gain:.16, reverb:1.0, filter:{type:'bandpass',mul:4,Q:2} },
+  sax:        { name:'Saxofone',           icon:'🎷', group:'Sopro',      wave:'sawtooth', partials:[[1,.50],[2,.22],[3,.15],[4,.08]],              attack:.035, decay:.10, sustain:.70, release:.15, detune:5, gain:.18, reverb:1.0, filter:{type:'lowpass',mul:7,Q:1.5}, vibrato:{rate:5,depth:6} },
+
+  trumpet:    { name:'Trompete',           icon:'🎺', group:'Metais',     wave:'sawtooth', partials:[[1,.45],[2,.30],[3,.20],[4,.12],[5,.07]],       attack:.012, decay:.12, sustain:.70, release:.10, detune:4, gain:.16, reverb:.9, filter:{type:'lowpass',mul:9,Q:1.2} },
+  trombone:   { name:'Trombone',           icon:'🎺', group:'Metais',     wave:'sawtooth', partials:[[1,.50],[2,.28],[3,.16],[4,.09]],              attack:.04,  decay:.12, sustain:.75, release:.16, detune:4, gain:.18, reverb:1.0, filter:{type:'lowpass',mul:7,Q:1} },
+
+  synth:      { name:'Sintetizador',       icon:'🎛️', group:'Sintético',  wave:'sawtooth', partials:[[1,.50],[2,.25],[3,.12],[4,.06]],              attack:.01,  decay:.25, sustain:.55, release:.20, detune:8, gain:.18, reverb:1.0, filter:{type:'lowpass',mul:6,Q:4,env:3} },
+  bell:       { name:'Sino / Celesta',     icon:'🔔', group:'Sintético',  wave:'sine',     partials:[[1,.50],[2.76,.20],[5.4,.10],[8.9,.05]],       attack:.002, decay:.70, sustain:.02, release:.30, tail:.12, detune:0, gain:.24, reverb:1.6 },
+  marimba:    { name:'Marimba',            icon:'🥁', group:'Percussivo', wave:'sine',     partials:[[1,.60],[3.9,.18],[9.2,.06]],                 attack:.002, decay:.35, sustain:.02, release:.08, detune:0, gain:.28, reverb:1.0 },
+  kalimba:    { name:'Kalimba',            icon:'🎶', group:'Percussivo', wave:'sine',     partials:[[1,.55],[2,.20],[3,.10],[4,.05]],              attack:.002, decay:.50, sustain:.03, release:.10, detune:0, gain:.28, reverb:1.1 },
+};
+
+// =====================================================================
+// STATE
+// =====================================================================
+let currentRoot = 0;
+let currentScale = 'major';
+let bpm = 120;
+let timeSig = 4;
+let currentOctave = 4;
+let currentInstrument = 'piano';
+let vocalStyle = 'free'; // free | easy | veryEasy — controla a "cantabilidade" da geração
+let arrangement = null;
+let arrangementEnabled = false;
+let currentSection = 0;
+let renderedSectionIndex = -1;
+
+// Uma frase é feita de compassos de 16 passos (colcheas em 4/4).
+// O seletor "Frase" escolhe 1, 2, 4 ou 8 compassos — 64 passos por padrão.
+const BAR_STEPS = 16;
+let phraseSteps = 64;
+function barCount() { return phraseSteps / BAR_STEPS; }
+function setPhraseSteps(n) {
+  phraseSteps = n;
+  CHORDS_PER_SECTION = phraseSteps / CHORD_STEPS;
+  document.documentElement.style.setProperty('--step-columns', String(n));
+  const title = document.getElementById('sequencerTitle');
+  if(title) title.textContent = `Sequenciador de Melodia (${n} Passos · ${barCount()} compass${barCount() === 1 ? 'o' : 'os'})`;
+}
+
+function getInstrument() { return INSTRUMENTS[currentInstrument] || INSTRUMENTS.piano; }
+
+// Timbres usados pelas camadas de acompanhamento
+const SONG_CHORD_CFG = { ...INSTRUMENTS.rhodes, octave:0, gain:0.12, sustain:0.55, release:0.25, reverb:0.8 };
+const SONG_BASS_CFG  = { ...INSTRUMENTS.bass, octave:0, gain:0.34 };
+
+let steps = new Array(phraseSteps).fill(null);
+let isPlaying = false;
+let currentStep = 0;
+let playInterval = null;
+
+let audioCtx = null;
+const activeNodes = {};
+
+const WHITE_KEYS = [0,2,4,5,7,9,11];
+const BLACK_KEYS_SEMI = [1,3,6,8,10];
+
+// Teclas do computador → notas MIDI (layout clássico de piano virtual)
+// Shift + tecla toca a mesma nota uma oitava acima.
+const PIANO_KEY_MAP = {
+  a: 48, w: 49, s: 50, e: 51, d: 52, f: 53, t: 54,
+  g: 55, y: 56, h: 57, u: 58, j: 59, k: 60,
+};
+const KEY_LABEL_BY_MIDI = {};
+Object.entries(PIANO_KEY_MAP).forEach(([key, midi]) => { KEY_LABEL_BY_MIDI[midi] = key; });
+const pressedPianoKeys = new Map();
+
+// =====================================================================
+// SCALE UTILS
+// =====================================================================
+function getScaleNotes(root, scaleType, octave) {
+  return SCALES[scaleType].map(i => root + i + (octave * 12) + 12);
+}
+
+function getScaleDegreeNotes() {
+  return SCALES[currentScale].map(i => currentRoot + i + currentOctave * 12 + 12);
+}
+
+function midiToNoteName(midi) {
+  const oct = Math.floor(midi / 12) - 1;
+  return `${NOTE_NAMES[midi % 12]}${oct}`;
+}
+
+function noteNameShort(midi) {
+  return NOTE_NAMES[midi % 12];
+}
+
+// =====================================================================
+// TABS
+// =====================================================================
+function switchTab(btn, tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['compose','theory','rhythm','export'].forEach(id => {
+    document.getElementById('tab-'+id).classList.add('hidden');
+  });
+  document.getElementById('tab-'+tabId).classList.remove('hidden');
+  if(tabId === 'export') updateCompositionSummary();
+}
+
+function buildInstrumentSelect() {
+  const sel = document.getElementById('instrumentSelect');
+  sel.innerHTML = '';
+  const groups = [...new Set(Object.values(INSTRUMENTS).map(i => i.group))];
+  groups.forEach(group => {
+    const og = document.createElement('optgroup');
+    og.label = group;
+    Object.entries(INSTRUMENTS).filter(([, cfg]) => cfg.group === group).forEach(([id, cfg]) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = `${cfg.icon} ${cfg.name}`;
+      if(id === currentInstrument) opt.selected = true;
+      og.appendChild(opt);
+    });
+    sel.appendChild(og);
+  });
+  updateInstrument();
+}
+
+function updateInstrument() {
+  currentInstrument = document.getElementById('instrumentSelect').value;
+  const cfg = getInstrument();
+  const octaveNote = cfg.octave ? ' · soa uma oitava abaixo' : '';
+  document.getElementById('instrumentInfo').textContent = `${cfg.group} · ${cfg.name}${octaveNote}`;
+  // Não deixa nota presa ao trocar de timbre com a tecla ainda apertada
+  Object.keys(activeNodes).forEach(midi => stopNote(Number(midi)));
+  sampledHeld.forEach(midi => stopNote(midi));
+
+  if(cfg.sampled) requestSampledPiano();
+  else if(!splendidPiano && !splendidFailed) setSampleStatus('', 'info');
+}
+
+function cycleInstrument(delta) {
+  const ids = Object.keys(INSTRUMENTS);
+  const i = ids.indexOf(currentInstrument);
+  const next = ids[(i + delta + ids.length) % ids.length];
+  document.getElementById('instrumentSelect').value = next;
+  updateInstrument();
+}
+
+// =====================================================================
+// PIANO
+// =====================================================================
+function addKeyShortcutLabel(key, midi) {
+  key.dataset.midi = midi;
+  const label = KEY_LABEL_BY_MIDI[midi];
+  if(label) {
+    const span = document.createElement('span');
+    span.className = 'key-label';
+    span.textContent = label;
+    key.appendChild(span);
+    key.title = `${NOTE_NAMES[midi % 12]}${Math.floor(midi/12)-1} — tecla ${label.toUpperCase()}`;
+  }
+}
+
+function pressKeyVisual(midi) {
+  document.querySelectorAll(`.key-white[data-midi="${midi}"], .key-black[data-midi="${midi}"]`)
+    .forEach(k => k.classList.add('active'));
+}
+
+function releaseKeyVisual(midi) {
+  document.querySelectorAll(`.key-white[data-midi="${midi}"], .key-black[data-midi="${midi}"]`)
+    .forEach(k => k.classList.remove('active'));
+}
+
+function buildPiano() {
+  const piano = document.getElementById('piano');
+  piano.innerHTML = '';
+
+  const startOctave = 3;
+  const totalOctaves = 2;
+  const inScaleSet = new Set(SCALES[currentScale].map(i => (currentRoot + i) % 12));
+
+  for(let oct = startOctave; oct < startOctave + totalOctaves; oct++) {
+    const octaveWrap = document.createElement('div');
+    octaveWrap.style.cssText = 'position:relative;display:flex;flex-shrink:0;';
+
+    // White keys
+    for(let wi = 0; wi < 7; wi++) {
+      const semi = WHITE_KEYS[wi];
+      const midi = oct * 12 + semi + 12;
+      const isRoot = semi === currentRoot % 12;
+      const inScale = inScaleSet.has(semi);
+
+      const key = document.createElement('div');
+      key.className = `key-white${isRoot?' root':inScale?' in-scale':''}`;
+      key.title = `${NOTE_NAMES[semi]}${oct}`;
+      addKeyShortcutLabel(key, midi);
+      key.addEventListener('mousedown', () => { playNoteInteractive(midi); pressKeyVisual(midi); });
+      key.addEventListener('mouseup', () => { stopNote(midi); releaseKeyVisual(midi); });
+      key.addEventListener('mouseleave', () => { stopNote(midi); releaseKeyVisual(midi); });
+      octaveWrap.appendChild(key);
+    }
+
+    // Black keys
+    const blackPositions = [
+      {semi:1, whiteIdx:0},
+      {semi:3, whiteIdx:1},
+      {semi:6, whiteIdx:3},
+      {semi:8, whiteIdx:4},
+      {semi:10, whiteIdx:5},
+    ];
+    blackPositions.forEach(({semi, whiteIdx}) => {
+      const midi = oct * 12 + semi + 12;
+      const inScale = inScaleSet.has(semi);
+
+      const key = document.createElement('div');
+      key.className = `key-black${inScale?' in-scale':''}`;
+      key.style.left = `${whiteIdx * 36 + 22}px`;
+      key.title = `${NOTE_NAMES[semi]}${oct}`;
+      addKeyShortcutLabel(key, midi);
+      key.addEventListener('mousedown', () => { playNoteInteractive(midi); pressKeyVisual(midi); });
+      key.addEventListener('mouseup', () => { stopNote(midi); releaseKeyVisual(midi); });
+      key.addEventListener('mouseleave', () => { stopNote(midi); releaseKeyVisual(midi); });
+      octaveWrap.appendChild(key);
+    });
+
+    piano.appendChild(octaveWrap);
+  }
+}
+
+// =====================================================================
+// AUDIO ENGINE
+// =====================================================================
+function ensureAudio() {
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+// =====================================================================
+// MASTER BUS + REVERB (barramento único — evita acúmulo de ruído)
+// =====================================================================
+let masterBus = null;
+let reverbNode = null;
+
+function getMasterBus() {
+  if(masterBus) return masterBus;
+  const comp = audioCtx.createDynamicsCompressor();
+  comp.threshold.value = -12;
+  comp.knee.value = 14;
+  comp.ratio.value = 5;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.18;
+  comp.connect(audioCtx.destination);
+  masterBus = comp;
+  return comp;
+}
+
+function getReverbBus() {
+  if(reverbNode) return reverbNode;
+  const len = Math.floor(audioCtx.sampleRate * 1.1);
+  const buf = audioCtx.createBuffer(2, len, audioCtx.sampleRate);
+  for(let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for(let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    }
+  }
+  const conv = audioCtx.createConvolver();
+  conv.buffer = buf;
+
+  // Remove o chiado agudo da cauda do reverb
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 3000;
+  lp.Q.value = 0.5;
+
+  const wet = audioCtx.createGain();
+  wet.gain.value = 0.14;
+
+  conv.connect(lp);
+  lp.connect(wet);
+  wet.connect(getMasterBus());
+  reverbNode = conv;
+  return conv;
+}
+
+// =====================================================================
+// PIANO REAL (samples do SplendidGrandPiano via smplr) — modo híbrido
+// A melodia pode usar samples; acompanhamento continua sintetizado.
+// =====================================================================
+let loadSmplrModule = () => import('https://unpkg.com/smplr/dist/index.mjs');
+let splendidPiano = null;
+let splendidPromise = null;
+let splendidFailed = false;
+let sampledPianoBus = null;
+const sampledHeld = new Set();
+
+// O piano amostrado tem um barramento próprio com realce, para a melodia
+// ficar à frente da harmonia (acordes/baixo/bateria) no mesmo mix comprimido.
+const SAMPLED_PIANO_GAIN = 2.2;
+
+function getSampledPianoBus() {
+  if(sampledPianoBus) return sampledPianoBus;
+  ensureAudio();
+  const g = audioCtx.createGain();
+  g.gain.value = SAMPLED_PIANO_GAIN;
+  g.connect(getMasterBus());
+  sampledPianoBus = g;
+  return g;
+}
+
+function setSampleStatus(text, tone) {
+  const el = document.getElementById('sampleStatus');
+  if(!el) return;
+  el.textContent = text;
+  el.className = `text-xs mt-1 ${tone === 'ok' ? 'text-emerald-400' : tone === 'err' ? 'text-amber-400' : 'text-slate-500'}`;
+}
+
+// Carregamento preguiçoso: só baixa a biblioteca e os samples quando o
+// instrumento "Piano Real" é escolhido. Se falhar, o fallback é sintetizado.
+function requestSampledPiano() {
+  if(splendidPiano) return Promise.resolve(splendidPiano);
+  if(splendidFailed) return Promise.resolve(null);
+  if(splendidPromise) return splendidPromise;
+
+  setSampleStatus('🎹 Piano real: carregando samples… (requer internet)', 'info');
+  splendidPromise = Promise.resolve()
+    .then(() => loadSmplrModule())
+    .then(mod => {
+      if(!mod || typeof mod.SplendidGrandPiano !== 'function') throw new Error('smplr indisponível');
+      ensureAudio();
+      return mod.SplendidGrandPiano(audioCtx, {
+        destination: getSampledPianoBus(),
+        volume: 118,
+        onLoadProgress: ({ loaded, total }) => {
+          if(total) setSampleStatus(`🎹 Piano real: carregando samples… ${loaded}/${total}`, 'info');
+        },
+      });
+    })
+    .then(p => p.ready.then(() => p))
+    .then(p => {
+      splendidPiano = p;
+      setSampleStatus('🎹 Piano real pronto · acordes, baixo e bateria seguem sintetizados', 'ok');
+      return p;
+    })
+    .catch(err => {
+      splendidFailed = true;
+      console.warn('Piano real indisponível; usando o piano sintetizado:', err);
+      setSampleStatus('🎹 Piano real indisponível — usando o piano sintetizado', 'err');
+      return null;
+    });
+  return splendidPromise;
+}
+
+// Toca pela amostra quando disponível. Durante o carregamento (ou se falhar)
+// devolve false e o chamador usa o sintetizador normalmente.
+function useSampledPiano(midi, velocity, duration, held) {
+  if(currentInstrument !== 'realPiano') return false;
+  requestSampledPiano();
+  if(!splendidPiano) return false;
+  const opts = {
+    note: midi,
+    velocity: Math.max(1, Math.min(127, Math.round(velocity * 100))),
+  };
+  if(!held) opts.duration = Math.max(0.05, duration || 0.4);
+  try { splendidPiano.start(opts); return true; }
+  catch(e) { return false; }
+}
+
+// Voz genérica: a configuração do instrumento define forma de onda, parciais,
+// envelope, filtro, vibrato e envio de reverb. Eventos sempre em ordem temporal.
+function startVoice(cfg, midi, velocity, duration, held) {
+  ensureAudio();
+  const freq = midiToFreq(midi + (cfg.octave || 0) * 12);
+  const now = audioCtx.currentTime;
+
+  const voiceGain = audioCtx.createGain();
+  const send = audioCtx.createGain();
+  send.gain.value = cfg.reverb;
+  voiceGain.connect(getMasterBus());   // som seco
+  voiceGain.connect(send);
+  send.connect(getReverbBus());        // envio compartilhado
+
+  let dest = voiceGain;
+  if(cfg.filter) {
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = cfg.filter.type;
+    filter.Q.value = cfg.filter.Q;
+    const cutoff = Math.max(200, Math.min(12000, freq * cfg.filter.mul));
+    filter.frequency.setValueAtTime(cfg.filter.env ? Math.min(16000, cutoff * cfg.filter.env) : cutoff, now);
+    if(cfg.filter.env) filter.frequency.exponentialRampToValueAtTime(cutoff, now + Math.max(cfg.decay, 0.05));
+    filter.connect(voiceGain);
+    dest = filter;
+  }
+
+  let lfo = null, lfoGain = null;
+  if(cfg.vibrato) {
+    lfo = audioCtx.createOscillator();
+    lfo.frequency.value = cfg.vibrato.rate;
+    lfoGain = audioCtx.createGain();
+    lfoGain.gain.value = cfg.vibrato.depth;
+    lfo.connect(lfoGain);
+    lfo.start(now);
+  }
+
+  const attack = held ? cfg.attack : Math.min(cfg.attack, Math.max(0.002, duration * 0.5));
+  const peak = Math.max(cfg.gain * velocity, 0.0002);
+  const sus  = Math.max(cfg.gain * velocity * cfg.sustain, 0.0002);
+  const release = cfg.release;
+  const releaseAt = held ? null : Math.max(
+    now + attack + cfg.decay + 0.005,
+    now + duration + (cfg.tail !== undefined ? cfg.tail : -0.02)
+  );
+
+  const oscs = [];
+  cfg.partials.forEach(([mult, gv]) => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = cfg.wave;
+    osc.frequency.value = freq * mult;
+    if(cfg.detune) osc.detune.value = (Math.random() - 0.5) * cfg.detune;
+    if(lfoGain) lfoGain.connect(osc.detune);
+    osc.connect(g);
+    g.connect(dest);
+
+    const p = Math.max(gv * peak, 0.0002);
+    const s = Math.max(gv * sus, 0.0002);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(p, now + attack);
+    g.gain.exponentialRampToValueAtTime(s, now + attack + cfg.decay);
+    osc.start(now);
+    if(!held) {
+      g.gain.setValueAtTime(s, releaseAt);
+      g.gain.exponentialRampToValueAtTime(0.0001, releaseAt + release);
+      osc.stop(releaseAt + release + 0.01);
+    }
+    oscs.push(osc);
+  });
+
+  voiceGain.gain.setValueAtTime(1, now);
+  if(!held) {
+    voiceGain.gain.setValueAtTime(1, releaseAt);
+    voiceGain.gain.linearRampToValueAtTime(0, releaseAt + release + 0.01);
+    if(lfo) { try { lfo.stop(releaseAt + release + 0.02); } catch(e) {} }
+    return null;
+  }
+  return { voiceGain, oscs, lfo };
+}
+
+function stopVoice(v) {
+  if(!v) return;
+  const now = audioCtx.currentTime;
+  try {
+    v.voiceGain.gain.cancelScheduledValues(now);
+    v.voiceGain.gain.setValueAtTime(Math.max(v.voiceGain.gain.value, 0.0001), now);
+    v.voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    v.oscs.forEach(osc => { try { osc.stop(now + 0.09); } catch(e) {} });
+    if(v.lfo) { try { v.lfo.stop(now + 0.09); } catch(e) {} }
+  } catch(e) {}
+}
+
+function playNoteInteractive(midi) {
+  if(useSampledPiano(midi, 0.8, 0, true)) { sampledHeld.add(midi); return; }
+  if(activeNodes[midi]) { stopVoice(activeNodes[midi]); delete activeNodes[midi]; }
+  activeNodes[midi] = startVoice(getInstrument(), midi, 0.8, 0, true);
+}
+
+function playNote(midi, velocity, duration) {
+  if(useSampledPiano(midi, velocity, duration, false)) return;
+  startVoice(getInstrument(), midi, velocity, duration, false);
+}
+
+function stopNote(midi) {
+  if(sampledHeld.has(midi)) {
+    sampledHeld.delete(midi);
+    if(splendidPiano) { try { splendidPiano.stop(midi); } catch(e) {} }
+    return;
+  }
+  if(!activeNodes[midi]) return;
+  stopVoice(activeNodes[midi]);
+  delete activeNodes[midi];
+}
+
+// =====================================================================
+// ACOMPANHAMENTO — acordes, baixo e bateria sintetizados
+// =====================================================================
+let noiseBuffer = null;
+function getNoiseBuffer() {
+  if(noiseBuffer) return noiseBuffer;
+  const len = Math.floor(audioCtx.sampleRate * 0.4);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  noiseBuffer = buf;
+  return buf;
+}
+
+function drumOutput() {
+  const out = audioCtx.createGain();
+  const send = audioCtx.createGain();
+  send.gain.value = 0.3;
+  out.connect(getMasterBus());
+  out.connect(send);
+  send.connect(getReverbBus());
+  return out;
+}
+
+function playKick(velocity) {
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  const out = drumOutput();
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, now);
+  osc.frequency.exponentialRampToValueAtTime(45, now + 0.12);
+  g.gain.setValueAtTime(Math.max(velocity, 0.0001), now);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+  osc.connect(g);
+  g.connect(out);
+  osc.start(now);
+  osc.stop(now + 0.3);
+}
+
+function playSnare(velocity) {
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  const out = drumOutput();
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = getNoiseBuffer();
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 1200;
+  const ng = audioCtx.createGain();
+  ng.gain.setValueAtTime(Math.max(velocity * 0.5, 0.0001), now);
+  ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+  src.connect(hp);
+  hp.connect(ng);
+  ng.connect(out);
+  src.start(now);
+  src.stop(now + 0.18);
+
+  const osc = audioCtx.createOscillator();
+  const og = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = 180;
+  og.gain.setValueAtTime(Math.max(velocity * 0.3, 0.0001), now);
+  og.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+  osc.connect(og);
+  og.connect(out);
+  osc.start(now);
+  osc.stop(now + 0.12);
+}
+
+function playHat(velocity) {
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  const out = drumOutput();
+  const src = audioCtx.createBufferSource();
+  src.buffer = getNoiseBuffer();
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 7000;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(Math.max(velocity * 0.28, 0.0001), now);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+  src.connect(hp);
+  hp.connect(g);
+  g.connect(out);
+  src.start(now);
+  src.stop(now + 0.06);
+}
+
+function playChord(notes, velocity, duration) {
+  notes.forEach(midi => startVoice(SONG_CHORD_CFG, midi, velocity, duration, false));
+}
+
+function playBass(midi, velocity, duration) {
+  startVoice(SONG_BASS_CFG, midi, velocity, duration, false);
+}
+
+function playArrangementStep(section, step, stepDuration) {
+  if(!section) return;
+  if(step % CHORD_STEPS === 0) {
+    const chord = section.chords[step / CHORD_STEPS];
+    if(chord) playChord(chord.notes, 0.5, stepDuration * (CHORD_STEPS - 0.4));
+  }
+  const bassMidi = section.bass[step];
+  if(bassMidi !== null && bassMidi !== undefined) playBass(bassMidi, 0.6, stepDuration * 0.9);
+  if(section.drums.kick[step])  playKick(0.9);
+  if(section.drums.snare[step]) playSnare(0.7);
+  if(section.drums.hat[step])   playHat(0.5);
+}
+
+// =====================================================================
+// SEQUENCER
+// =====================================================================
+function buildSequencerGrid() {
+  const grid = document.getElementById('sequencerGrid');
+  grid.innerHTML = '';
+
+  const scaleNotes = getScaleDegreeNotes();
+  const extended = [...scaleNotes, scaleNotes[0] + 12];
+  const labels = [...scaleNotes.map((_,i) => (i+1).toString()), '8'];
+
+  for(let ri = extended.length - 1; ri >= 0; ri--) {
+    const midi = extended[ri];
+    const row = document.createElement('div');
+    row.className = 'flex gap-1 items-center';
+
+    const lbl = document.createElement('div');
+    lbl.className = 'text-xs font-mono text-slate-500 w-10 text-right flex-shrink-0';
+    lbl.innerHTML = `<span class="text-slate-400">${labels[ri]}</span> <span style="font-size:10px">${noteNameShort(midi)}</span>`;
+    row.appendChild(lbl);
+
+    const cellsWrap = document.createElement('div');
+    cellsWrap.className = 'step-grid flex-1';
+
+    for(let si = 0; si < phraseSteps; si++) {
+      const cell = document.createElement('div');
+      cell.className = 'step-cell';
+      cell.dataset.step = si;
+      cell.dataset.midi = midi;
+
+      if(steps[si] === midi) {
+        cell.classList.add('on');
+        applyBeatClass(cell, si);
+      }
+
+      cell.addEventListener('click', () => toggleStep(si, midi, cell));
+      cellsWrap.appendChild(cell);
+    }
+
+    row.appendChild(cellsWrap);
+    grid.appendChild(row);
+  }
+
+  buildStepIndicators();
+  updateMelodyDisplay();
+  updateContour();
+  updateAnalysis();
+}
+
+function applyBeatClass(cell, step) {
+  cell.classList.remove('beat1','beat3','barStart');
+  const pos = step % BAR_STEPS;
+  if(pos === 0) cell.classList.add('beat1','barStart');
+  else if(pos === 8) cell.classList.add('beat1');
+  else if(pos === 4 || pos === 12) cell.classList.add('beat3');
+}
+
+function toggleStep(stepIdx, midi, cell) {
+  if(steps[stepIdx] === midi) {
+    steps[stepIdx] = null;
+    document.querySelectorAll(`.step-cell[data-step="${stepIdx}"]`).forEach(c => {
+      c.classList.remove('on','beat1','beat3');
+    });
+  } else {
+    steps[stepIdx] = midi;
+    document.querySelectorAll(`.step-cell[data-step="${stepIdx}"]`).forEach(c => {
+      c.classList.remove('on','beat1','beat3');
+    });
+    cell.classList.add('on');
+    applyBeatClass(cell, stepIdx);
+  }
+  updateMelodyDisplay();
+  updateContour();
+  updateAnalysis();
+}
+
+function buildStepIndicators() {
+  const wrap = document.getElementById('stepIndicators');
+  wrap.innerHTML = '';
+  for(let i = 0; i < phraseSteps; i++) {
+    const dot = document.createElement('div');
+    dot.id = `step-ind-${i}`;
+    dot.style.cssText = `height:4px;border-radius:2px;background:${i%BAR_STEPS===0?'#64748b':i%4===0?'#334155':'#1e2235'};transition:background 0.1s;`;
+    wrap.appendChild(dot);
+  }
+}
+
+function updateStepCursor(step) {
+  const s = (step === undefined ? currentStep : step) % phraseSteps;
+  document.querySelectorAll('.step-cell').forEach(c => c.classList.remove('playing','cursor'));
+  document.querySelectorAll(`.step-cell[data-step="${s}"]`).forEach(c => {
+    c.classList.add(c.classList.contains('on') ? 'playing' : 'cursor');
+  });
+  document.querySelectorAll('.arr-cell').forEach(c => c.classList.remove('playing'));
+  document.querySelectorAll(`.arr-cell[data-step="${s}"]`).forEach(c => c.classList.add('playing'));
+  for(let i = 0; i < phraseSteps; i++) {
+    const ind = document.getElementById(`step-ind-${i}`);
+    if(ind) ind.style.background = i === s ? '#3b82f6'
+      : (i%BAR_STEPS===0?'#64748b':i%4===0?'#334155':'#1e2235');
+  }
+}
+
+// =====================================================================
+// PLAY ENGINE
+// =====================================================================
+function togglePlay() {
+  isPlaying ? stopPlay() : startPlay();
+}
+
+function startPlay() {
+  ensureAudio();
+  isPlaying = true;
+  currentStep = 0;
+  currentSection = 0;
+  renderedSectionIndex = -1;
+  const btn = document.getElementById('btnPlay');
+  btn.textContent = '⏹ Stop';
+  btn.className = 'btn btn-danger';
+
+  const msPerStep = (60 / bpm) * 1000 / 4;
+  const stepDuration = msPerStep / 1000;
+  const songMode = !!(arrangement && arrangementEnabled);
+  const loopSteps = songMode ? arrangement.sections.length * phraseSteps : phraseSteps;
+  let hasPlayed = false;
+
+  playInterval = setInterval(() => {
+    // Ao reiniciar o ciclo, cria e guarda novas variações se o usuário pediu.
+    if(songMode && hasPlayed && currentStep === 0) {
+      const auto = document.getElementById('autoVariations');
+      if(auto && auto.checked) {
+        currentSection = 0;
+        regenerateVariations();
+      }
+    }
+    hasPlayed = true;
+
+    const local = currentStep % phraseSteps;
+    let midi = steps[local];
+
+    if(songMode) {
+      const idx = Math.floor(currentStep / phraseSteps);
+      const section = arrangement.sections[idx];
+      if(section) {
+        if(idx !== currentSection) {
+          currentSection = idx;
+          renderSongFormStrip();
+        }
+        if(renderedSectionIndex !== idx) renderSectionDetail(idx);
+        midi = section.melody[local];
+        playArrangementStep(section, local, stepDuration);
+      }
+    }
+
+    updateStepCursor(local);
+    if(midi !== null && midi !== undefined) playNote(midi, 0.5, stepDuration * 0.82);
+    currentStep = (currentStep + 1) % loopSteps;
+  }, msPerStep);
+}
+
+function stopPlay() {
+  isPlaying = false;
+  clearInterval(playInterval);
+  currentStep = 0;
+  currentSection = 0;
+  renderedSectionIndex = -1;
+  const btn = document.getElementById('btnPlay');
+  btn.textContent = '▶ Play';
+  btn.className = 'btn btn-success';
+  document.querySelectorAll('.step-cell').forEach(c => c.classList.remove('playing','cursor'));
+  document.querySelectorAll('.arr-cell').forEach(c => c.classList.remove('playing'));
+  if(arrangement) renderArrangement();
+  for(let i = 0; i < phraseSteps; i++) {
+    const ind = document.getElementById(`step-ind-${i}`);
+    if(ind) ind.style.background = i%BAR_STEPS===0?'#64748b':i%4===0?'#334155':'#1e2235';
+  }
+}
+
+// =====================================================================
+// SCALE UPDATE
+// =====================================================================
+function updateScale() {
+  currentRoot = ROOTS[document.getElementById('rootNote').value];
+  currentScale = document.getElementById('scaleType').value;
+  currentOctave = parseInt(document.getElementById('octaveSelect').value);
+
+  // Remap existing steps to new scale (keep positions, clear notes not in new scale)
+  const newScaleNotes = getScaleDegreeNotes();
+  const extended = [...newScaleNotes, newScaleNotes[0] + 12];
+  const validMidis = new Set(extended);
+  steps = steps.map(m => validMidis.has(m) ? m : null);
+
+  if(arrangement) buildFullSong(); // acordes e baixo acompanham a nova tonalidade
+  buildPiano();
+  buildSequencerGrid();
+  updateScaleDisplay();
+}
+
+function updateScaleDisplay() {
+  const intervals = SCALES[currentScale];
+  const display = document.getElementById('scaleNotesDisplay');
+  display.innerHTML = '';
+  intervals.forEach((interval, i) => {
+    const noteIdx = (currentRoot + interval) % 12;
+    const span = document.createElement('span');
+    span.className = `badge ${i===0?'badge-yellow':'badge-blue'}`;
+    span.textContent = NOTE_NAMES[noteIdx];
+    display.appendChild(span);
+  });
+
+  const emotion = SCALE_EMOTIONS[currentScale];
+  const badge = document.getElementById('scaleEmotionBadge');
+  badge.className = `badge ${emotion.badge}`;
+  badge.textContent = `${currentScale.replace(/_/g,' ')}: ${emotion.text}`;
+}
+
+function updateBPM(val) {
+  bpm = parseInt(val);
+  document.getElementById('bpmDisplay').textContent = val;
+  if(isPlaying) { stopPlay(); startPlay(); }
+}
+
+function updateTimeSig() {
+  timeSig = parseInt(document.getElementById('timeSignature').value);
+  document.getElementById('timeSigInfo').textContent = TIME_SIG_INFO[timeSig] || '';
+}
+
+// =====================================================================
+// MELODY GENERATION
+// =====================================================================
+const CONTOURS = ['arch','ascending','descending','wave'];
+const CHORD_INTERVALS = [0, 3, 4, 7]; // tônica, terça e quinta do acorde
+
+function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function shuffle(arr) {
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function clampDegree(d, max) { return Math.max(0, Math.min(d, max)); }
+function nearestDegree(candidates, target) {
+  if(!candidates.length) return target;
+  return candidates.reduce((a,b) => Math.abs(a - target) <= Math.abs(b - target) ? a : b);
+}
+
+// Graus que formam o acorde I (tônica/terça/quinta) + tônica aguda
+function chordDegrees() {
+  const scale = SCALES[currentScale];
+  const degs = scale.map((iv, i) => CHORD_INTERVALS.includes(iv) ? i : -1).filter(i => i >= 0);
+  degs.push(scale.length);
+  return degs;
+}
+
+// Dominante = grau com intervalo de quinta justa (quando a escala o tiver)
+function dominantDegree(maxDeg) {
+  const idx = SCALES[currentScale].indexOf(7);
+  return clampDegree(idx >= 0 ? idx : Math.min(4, maxDeg), maxDeg);
+}
+
+// Linha melódica: contorno global + movimento por graus, saltos compensados
+// e cadência na tônica mais próxima (sem saltos bruscos no final).
+function buildDegreePath(contour, activeSteps, totalDegrees) {
+  const maxDeg = totalDegrees - 1;
+  const n = activeSteps.length;
+  const chordDegs = chordDegrees().filter(d => d <= maxDeg);
+  const domDeg = dominantDegree(maxDeg);
+  const tonicDegs = [0, SCALES[currentScale].length].filter(d => d <= maxDeg);
+
+  const contourTarget = (t) => {
+    if(contour === 'arch') return Math.round((t < 0.5 ? t * 2 : (1 - t) * 2) * maxDeg);
+    if(contour === 'ascending') return Math.round(t * maxDeg);
+    if(contour === 'descending') return Math.round((1 - t) * maxDeg);
+    return Math.round((Math.sin(t * Math.PI * 2.5) * 0.5 + 0.5) * maxDeg);
+  };
+
+  const path = new Array(phraseSteps).fill(null);
+  let prev = null;
+  let leapBack = 0;
+
+  activeSteps.forEach((step, i) => {
+    const t = i / Math.max(n - 1, 1);
+    let goal = contourTarget(t);
+
+    // Tempos fortes (1, 5, 9, 13): favorece notas do acorde
+    if(step % 4 === 0 && Math.random() < 0.75) goal = nearestDegree(chordDegs, goal);
+
+    // Metade da frase cria tensão na dominante antes da resolução
+    if(n > 4 && i === Math.floor(n / 2) - 1 && Math.random() < 0.65) goal = domDeg;
+
+    let deg;
+    if(prev === null) {
+      deg = clampDegree(goal, maxDeg);
+    } else if(leapBack !== 0) {
+      // Após um salto, resolve por grau conjunto no sentido oposto
+      deg = clampDegree(prev + leapBack, maxDeg);
+      leapBack = 0;
+    } else {
+      const diff = goal - prev;
+      const dir = Math.sign(diff);
+      const dist = Math.abs(diff);
+      let move = 0;
+      if(dist > 0) {
+        const r = Math.random();
+        if(r < 0.58) move = dir;          // grau conjunto (suave, cantável)
+        else if(r < 0.85) move = dir * 2; // salto moderado
+        else move = dir * 3;              // salto dramático (raro)
+        if(dist > 1 && Math.random() < 0.12) move = -Math.sign(move);
+      }
+      deg = clampDegree(prev + move, maxDeg);
+      if(Math.abs(move) >= 2) leapBack = -Math.sign(move);
+    }
+
+    path[step] = deg;
+    prev = deg;
+  });
+
+  // Cadência final: a tônica mais próxima da última nota
+  if(prev !== null && n > 1) {
+    const last = activeSteps[activeSteps.length - 1];
+    path[last] = nearestDegree(tonicDegs, prev);
+  }
+  return path;
+}
+
+// =====================================================================
+// CANTABILIDADE — reduz o problema a quatro fatores que realmente
+// importam para quem vai cantar: âmbito, movimento, densidade e motif.
+// =====================================================================
+const VOCAL_LABELS = { free:'Livre', easy:'Fácil de cantar', veryEasy:'Muito fácil' };
+const VOCAL_HINTS = {
+  free: 'Estilo livre: ritmos variados e amplitude total da escala.',
+  easy: '🎤 Fácil de cantar: até 5 notas em 9 semitões, motivos repetidos e sequenciados, notas nos tempos fortes e respiro no final. Experimente 80–110 BPM.',
+  veryEasy: '🎤 Muito fácil: até 4 notas em 7 semitões, movimento quase todo conjunto, durações longas e final na tônica. Experimente 80–110 BPM.',
+};
+
+// Ritmos que dão tempo para respirar: notas nos tempos fortes e pausa no fim.
+const SINGABLE_RHYTHMS = {
+  easy: [
+    [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0],
+    [1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,1,0,1,0,0,0,0,0,0,0],
+    [1,0,0,0,1,0,0,0,1,0,1,0,0,0,0,0],
+    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+    [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0],
+    [1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0],
+  ],
+  veryEasy: [
+    [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+    [1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0],
+    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+    [1,0,0,0,1,0,1,0,1,0,0,0,0,0,0,0],
+  ],
+};
+const SINGABLE_RHYTHM_NAMES = ['sparse','halfNotes','threeQuarters'];
+
+function updateVocalHint() {
+  const el = document.getElementById('vocalHint');
+  if(el) el.textContent = VOCAL_HINTS[vocalStyle] || VOCAL_HINTS.free;
+}
+
+function changeVocalStyle() {
+  const sel = document.getElementById('vocalStyle');
+  vocalStyle = (sel && VOCAL_HINTS[sel.value]) ? sel.value : 'free';
+  updateVocalHint();
+  generateMelody(); // trocar o estilo aplica o novo estilo na hora
+}
+
+function cycleVocalStyle() {
+  const order = ['free','easy','veryEasy'];
+  vocalStyle = order[(order.indexOf(vocalStyle) + 1) % order.length];
+  const sel = document.getElementById('vocalStyle');
+  if(sel) sel.value = vocalStyle;
+  updateVocalHint();
+  generateMelody();
+}
+
+// Escolhe um subconjunto pentatônico da escala atual: sem semitons agudos,
+// sem trítono e dentro de um âmbito confortável (7 ou 9 semitões).
+function singableDegrees(totalDegrees, level) {
+  const iv = SCALES[currentScale];
+  const maxRange = level === 'veryEasy' ? 7 : 9;
+  const maxNotes = level === 'veryEasy' ? 4 : 5;
+  const semitone = d => iv[d % iv.length] + 12 * Math.floor(d / iv.length);
+  const rank = [0, 2, 4, 5, 1, 3, 6]; // tônica, 3ª, 5ª, 6ª, 2ª, 4ª, 7ª
+  const rankOf = d => rank[d % iv.length] !== undefined ? rank[d % iv.length] : 7;
+
+  const candidates = [];
+  for(let d = 0; d < totalDegrees; d++) {
+    const s = semitone(d);
+    if(s <= maxRange && s !== 1 && s !== 6 && s !== 11) candidates.push(d);
+  }
+  candidates.sort((a,b) => (rankOf(a) - rankOf(b)) || (semitone(a) - semitone(b)));
+
+  const chosen = [];
+  for(const d of candidates) {
+    const s = semitone(d);
+    const clash = chosen.some(c => {
+      const gap = Math.abs(s - semitone(c));
+      return gap === 1 || gap === 6 || gap === 11;
+    });
+    if(clash) continue;
+    chosen.push(d);
+    if(chosen.length >= maxNotes) break;
+  }
+  if(!chosen.includes(0)) chosen.unshift(0);
+  return chosen.sort((a,b) => a - b);
+}
+
+// Linha cantável: começa na tônica, repete um motivo curto (o "gancho")
+// e só se move por graus dentro do subconjunto permitido. Saltos são
+// compensados pelo movimento oposto na nota seguinte.
+function buildSingableDegreePath(contour, activeSteps, extended, level) {
+  const allowed = singableDegrees(extended.length, level);
+  const posOf = d => allowed.indexOf(d);
+  const clampSlot = s => Math.max(0, Math.min(allowed.length - 1, s));
+  const iv = SCALES[currentScale];
+  const semitoneOf = d => iv[d % iv.length] + 12 * Math.floor(d / iv.length);
+  const maxLeap = level === 'veryEasy' ? 4 : 5; // 3ª/4ª — nunca um sexto de repente
+  const leapOk = (a, b) => Math.abs(semitoneOf(a) - semitoneOf(b)) <= maxLeap;
+  // Na cadência final, descer até uma sexta até a tônica é natural de cantar.
+  const cadenceOk = (a, b) => semitoneOf(a) > semitoneOf(b) && semitoneOf(a) - semitoneOf(b) <= 9;
+  const nearestBySemitone = (candidates, target) => candidates.reduce(
+    (best, d) => Math.abs(semitoneOf(d) - semitoneOf(target)) < Math.abs(semitoneOf(best) - semitoneOf(target)) ? d : best,
+    candidates[0]);
+  const n = activeSteps.length;
+  const path = new Array(phraseSteps).fill(null);
+  if(!n) return path;
+
+  const targetSlot = t => {
+    if(contour === 'ascending') return t;
+    if(contour === 'descending') return 1 - t;
+    if(contour === 'wave') return Math.sin(t * Math.PI * 2) * 0.5 + 0.5;
+    return t < 0.5 ? t * 2 : (1 - t) * 2; // arco
+  };
+
+  const motifLen = Math.min(level === 'veryEasy' ? 2 : 4, n);
+  const motif = [0]; // o gancho sempre começa na tônica
+  let prevMotif = 0;
+  for(let j = 1; j < motifLen; j++) {
+    const goal = clampSlot(Math.round(targetSlot((j + 1) / (motifLen + 1)) * (allowed.length - 1)));
+    let deg = allowed[goal];
+    if(!leapOk(prevMotif, deg)) {
+      const near = allowed.filter(d => leapOk(d, prevMotif));
+      if(near.length) deg = nearestBySemitone(near, deg);
+    }
+    motif.push(deg);
+    prevMotif = deg;
+  }
+
+  let pending = 0;
+  activeSteps.forEach((step, i) => {
+    let deg;
+    if(i < motifLen) {
+      deg = motif[i];
+    } else if(pending !== 0) {
+      deg = allowed[clampSlot(posOf(path[activeSteps[i - 1]]) + pending)];
+      pending = 0;
+    } else if(Math.random() < (level === 'veryEasy' ? 0.72 : 0.58)) {
+      deg = motif[i % motifLen]; // repetição do motivo
+    } else {
+      const cur = posOf(path[activeSteps[i - 1]]);
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      const move = Math.random() < (level === 'veryEasy' ? 0.94 : 0.86) ? 1 : 2;
+      let target = cur + dir * move;
+      if(target < 0 || target >= allowed.length) target = cur - dir * move;
+      target = clampSlot(target);
+      deg = allowed[target];
+      if(Math.abs(target - cur) === 2) pending = -dir;
+    }
+    if(i > 0 && !leapOk(path[activeSteps[i - 1]], deg)) {
+      const near = allowed.filter(d => leapOk(d, path[activeSteps[i - 1]]));
+      if(near.length) deg = nearestBySemitone(near, deg);
+    }
+    path[step] = deg;
+  });
+
+  path[activeSteps[0]] = 0; // ataque na tônica
+  if(n > 1) {
+    const prevStep = activeSteps[n - 2];
+    const lastStep = activeSteps[n - 1];
+    const tonics = allowed.filter(d => d === 0 || d === SCALES[currentScale].length);
+    const tonic = nearestDegree(tonics.length ? tonics : [0], path[prevStep]);
+    path[lastStep] = tonic;
+    // Cadência suave: se a última nota exigir salto grande, a penúltima
+    // se aproxima da tônica para que a resolução também seja cantável.
+    if(!leapOk(path[prevStep], tonic) && !cadenceOk(path[prevStep], tonic)) {
+      const near = allowed.filter(d => leapOk(d, tonic));
+      if(near.length) path[prevStep] = nearestBySemitone(near, path[prevStep]);
+    }
+  }
+  return path;
+}
+
+// Despacho usado pelo gerador, pela edição de contorno e pelas estrofes.
+function buildMelodyDegreePath(contour, activeSteps, extended) {
+  if(vocalStyle === 'free') return buildDegreePath(contour, activeSteps, extended.length);
+  return buildSingableDegreePath(contour, activeSteps, extended, vocalStyle);
+}
+
+// Um compasso de 16 passos é a unidade de construção. A frase inteira é
+// montada repetindo compassos com pequenas variações, como um compositor
+// faz com um motivo (A–A′–B–A′).
+function buildPhraseRhythm() {
+  let bar;
+  if(vocalStyle === 'free') {
+    bar = pickRandom([
+      [1,0,1,0,1,0,1,0, 1,0,1,0,1,0,1,0],  // corcheas retas
+      [1,0,1,1,0,1,0,1, 1,0,1,1,0,1,0,1],  // sincopado
+      [1,0,0,1,0,0,1,0, 1,0,0,1,0,0,1,0],  // esparso
+      [1,0,1,0,1,1,0,1, 1,0,1,0,1,1,0,1],  // com preenchimentos
+      euclidean(5, BAR_STEPS),
+      euclidean(7, BAR_STEPS),
+    ]).slice();
+    for(let s = 0; s < BAR_STEPS; s++) {
+      if(s % 4 === 0) bar[s] = 1;             // tempo forte sempre marcado
+      else if(Math.random() < 0.12) bar[s] = bar[s] ? 0 : 1;
+    }
+    if(Math.random() < 0.65) bar[BAR_STEPS - 1] = 0; // respiro no final
+  } else {
+    bar = pickRandom(SINGABLE_RHYTHMS[vocalStyle] || SINGABLE_RHYTHMS.easy).slice();
+    if(Math.random() < (vocalStyle === 'veryEasy' ? 0.5 : 0.35)) bar[BAR_STEPS - 1] = 0;
+  }
+
+  const bars = [];
+  const count = barCount();
+  for(let b = 0; b < count; b++) {
+    const p = bar.slice();
+    // Um preenchimento no penúltimo compasso empurra a frase para o final.
+    if(count > 1 && b === count - 2 && vocalStyle === 'free' && Math.random() < 0.5) {
+      p[BAR_STEPS - 1] = 1;
+    }
+    bars.push(p);
+  }
+  return bars;
+}
+
+// Variação leve de um compasso: muda uma ou duas notas, preservando o ataque.
+function varyBarSequence(seq, extended, amount) {
+  const out = seq.slice();
+  const maxDeg = extended.length - 1;
+  const allowed = vocalStyle === 'free' ? null : singableDegrees(extended.length, vocalStyle);
+  const idxs = shuffle(out.map((_, i) => i).filter(i => i > 0));
+  for(let j = 0; j < Math.min(amount, idxs.length); j++) {
+    const i = idxs[j];
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const step = Math.random() < 0.7 ? 1 : 2;
+    if(allowed) {
+      const slot = Math.max(0, allowed.indexOf(out[i]));
+      out[i] = allowed[Math.max(0, Math.min(allowed.length - 1, slot + dir * step))];
+    } else {
+      out[i] = clampDegree(out[i] + dir * step, maxDeg);
+    }
+  }
+  return out;
+}
+
+// Reescreve a frase já montada: corrige saltos, acentos, dominante no meio
+// e cadência final. Trabalha em graus para respeitar a escala selecionada.
+function finalizePhraseBars(barsSeq, activeByBar, extended) {
+  const degs = new Array(phraseSteps).fill(null);
+  activeByBar.forEach((idxs, b) => idxs.forEach((abs, k) => {
+    if(abs < phraseSteps && barsSeq[b] && barsSeq[b].length) {
+      degs[abs] = barsSeq[b][k % barsSeq[b].length];
+    }
+  }));
+  const active = degs.map((d, i) => d === null ? -1 : i).filter(i => i >= 0);
+  if(!active.length) return barsSeq;
+
+  degs[active[0]] = 0; // toda a frase começa na tônica
+  const maxDegLeap = 3;
+  for(let n = 1; n < active.length; n++) {
+    const a = active[n - 1], b = active[n];
+    if(degs[b] === null) continue;
+    if(Math.abs(degs[b] - degs[a]) > maxDegLeap) {
+      degs[b] = degs[a] + Math.sign(degs[b] - degs[a]) * maxDegLeap;
+    }
+  }
+
+  if(vocalStyle === 'free') {
+    const chordDegs = chordDegrees().filter(d => d < extended.length);
+    active.filter(i => (i % BAR_STEPS) % 4 === 0).forEach(i => {
+      if(Math.random() < 0.65) degs[i] = nearestDegree(chordDegs, degs[i]);
+    });
+    // Tensão na dominante por volta do meio da frase.
+    if(active.length > 4) {
+      const mid = active[Math.floor((active.length - 1) / 2)];
+      const strong = active.filter(i => (i % BAR_STEPS) % 4 === 0);
+      const target = strong.length
+        ? strong.reduce((best, i) => Math.abs(i - mid) < Math.abs(best - mid) ? i : best, strong[0])
+        : mid;
+      degs[target] = dominantDegree(extended.length - 1);
+    }
+  } else {
+    const smooth = smoothSingableDegrees(degs, extended, vocalStyle);
+    smooth.forEach((d, i) => { if(d !== null) degs[i] = d; });
+  }
+
+  const last = active[active.length - 1];
+  const prev = active.length > 1 ? active[active.length - 2] : last;
+  const tonicPool = vocalStyle === 'free'
+    ? [0, SCALES[currentScale].length].filter(d => d < extended.length)
+    : singableDegrees(extended.length, vocalStyle).filter(d => d === 0 || d === SCALES[currentScale].length);
+  degs[last] = nearestDegree(tonicPool.length ? tonicPool : [0], degs[prev]);
+  if(vocalStyle === 'free' && Math.abs(degs[last] - degs[prev]) > maxDegLeap) {
+    const near = chordDegrees().filter(d => d < extended.length && Math.abs(d - degs[last]) <= maxDegLeap);
+    if(near.length) degs[prev] = nearestDegree(near, degs[prev]);
+  }
+
+  return activeByBar.map(idxs => idxs.map(i => degs[i]));
+}
+
+// Formas clássicas de frase: A = tema, A′/A″ = tema com variação,
+// B = ideia contrastante, B′ = variação da ideia contrastante.
+const PHRASE_FORMS = [
+  ['A','A1','B','A1'],
+  ['A','B','A1','B1'],
+  ['A','A1','A2','B'],
+  ['A','B','B1','A1'],
+  ['A','A1','B','B1'],
+];
+
+// Desenvolvimento clássico: o gancho reaparece deslocado para cima ou para
+// baixo na escala (sequência), mantendo o intervalo original entre as notas.
+function sequenceBar(seq, extended, direction) {
+  const maxDeg = extended.length - 1;
+  const allowed = vocalStyle === 'free' ? null : singableDegrees(extended.length, vocalStyle);
+  if(allowed) {
+    return seq.map(d => {
+      const i = Math.max(0, allowed.indexOf(d));
+      return allowed[Math.max(0, Math.min(allowed.length - 1, i + direction))];
+    });
+  }
+  const shift = (direction > 0 ? 2 : -2) * Math.max(1, Math.abs(direction));
+  return seq.map(d => clampDegree(d + shift, maxDeg));
+}
+
+function arrangePhrase(seqByBar, activeByBar, extended, contour) {
+  const count = seqByBar.length;
+  if(count <= 1) return finalizePhraseBars(seqByBar, activeByBar, extended);
+
+  const theme = seqByBar[0].slice();
+  // A sequência vai para o lado com espaço na escala, evitando ficar presa
+  // na tônica aguda quando o tema já começa alto.
+  const avgDeg = theme.reduce((sum, d) => sum + d, 0) / Math.max(theme.length, 1);
+  const inward = avgDeg > (extended.length - 1) / 2 ? -1 : 1;
+  const direction = Math.random() < 0.2 ? -inward : inward;
+  let contrast;
+  if(theme.length >= 3) {
+    contrast = sequenceBar(theme, extended, direction);
+  } else {
+    const other = CONTOURS.filter(c => c !== contour);
+    const contrastContour = pickRandom(other.length ? other : CONTOURS);
+    const positions = theme.map((_, i) => i);
+    const path = buildMelodyDegreePath(contrastContour, positions, extended);
+    contrast = positions.map(i => path[i]);
+  }
+
+  const form = pickRandom(PHRASE_FORMS);
+  const arranged = seqByBar.map((_, b) => {
+    const label = form[b % form.length];
+    if(label === 'A') return theme.slice();
+    if(label === 'A1') return varyBarSequence(theme, extended, 1);
+    if(label === 'A2') return varyBarSequence(theme, extended, 2);
+    if(label === 'B') return contrast.slice();
+    return varyBarSequence(contrast, extended, 1);
+  });
+  return finalizePhraseBars(arranged, activeByBar, extended);
+}
+
+function writeBarsToSteps(barsSeq, activeByBar, extended) {
+  steps = new Array(phraseSteps).fill(null);
+  activeByBar.forEach((idxs, b) => idxs.forEach((abs, k) => {
+    if(abs < phraseSteps && barsSeq[b] && barsSeq[b].length) {
+      steps[abs] = extended[barsSeq[b][k % barsSeq[b].length]];
+    }
+  }));
+  buildSequencerGrid();
+  syncArrangement();
+}
+
+function activeBarsFromSteps() {
+  const activeByBar = Array.from({length: barCount()}, () => []);
+  steps.forEach((m, i) => {
+    if(m === null || m === undefined) return;
+    const b = Math.floor(i / BAR_STEPS);
+    if(activeByBar[b]) activeByBar[b].push(i);
+  });
+  return activeByBar;
+}
+
+function generateMelody() {
+  const scaleNotes = getScaleDegreeNotes();
+  const extended = [...scaleNotes, scaleNotes[0] + 12];
+  const barRhythms = buildPhraseRhythm();
+  const activeByBar = barRhythms.map((pat, b) =>
+    pat.map((on, i) => on ? b * BAR_STEPS + i : -1).filter(i => i >= 0));
+  const activeSteps = activeByBar.flat();
+  const contour = pickRandom(CONTOURS);
+  const baseDegrees = buildMelodyDegreePath(contour, activeSteps, extended);
+  const seqByBar = activeByBar.map(idxs => idxs.map(i => baseDegrees[i]));
+
+  writeBarsToSteps(arrangePhrase(seqByBar, activeByBar, extended, contour), activeByBar, extended);
+}
+
+// Recombina os compassos da melodia atual: repetição do tema + variações.
+function combineMelody() {
+  const activeByBar = activeBarsFromSteps();
+  if(activeByBar.every(idxs => !idxs.length)) { generateMelody(); return; }
+  const scaleNotes = getScaleDegreeNotes();
+  const extended = [...scaleNotes, scaleNotes[0] + 12];
+  const seqByBar = activeByBar.map(idxs => idxs.map(i => {
+    const d = extended.indexOf(steps[i]);
+    return d < 0 ? 0 : d;
+  }));
+  writeBarsToSteps(arrangePhrase(seqByBar, activeByBar, extended, pickRandom(CONTOURS)), activeByBar, extended);
+}
+
+function repairCurrentMelody() {
+  const activeByBar = activeBarsFromSteps();
+  if(activeByBar.every(idxs => !idxs.length)) return;
+  const scaleNotes = getScaleDegreeNotes();
+  const extended = [...scaleNotes, scaleNotes[0] + 12];
+  const seqByBar = activeByBar.map(idxs => idxs.map(i => {
+    const d = extended.indexOf(steps[i]);
+    return d < 0 ? 0 : d;
+  }));
+  writeBarsToSteps(finalizePhraseBars(seqByBar, activeByBar, extended), activeByBar, extended);
+}
+
+function changePhraseLength() {
+  const sel = document.getElementById('phraseLength');
+  const value = parseInt(sel && sel.value) || 64;
+  if(value === phraseSteps) return;
+  const old = steps.slice();
+  setPhraseSteps(value);
+  if(old.every(s => s === null || s === undefined)) { generateMelody(); return; }
+  // Ao crescer, repete o material existente em ciclos; ao encolher, corta.
+  steps = new Array(phraseSteps).fill(null);
+  for(let i = 0; i < phraseSteps; i++) steps[i] = old[i % old.length];
+  repairCurrentMelody();
+}
+
+// =====================================================================
+// MÚSICA COMPLETA — harmonia, baixo e bateria
+// =====================================================================
+const BASS_PATTERNS = {
+  pop:    [0,4,8,12],
+  rock:   [0,3,4,7,8,11,12,15],
+  jazz:   [0,4,7,8,12,14],
+  samba:  [0,2,4,6,8,10,12,14],
+  balada: [0,6,8,14],
+};
+
+const DRUM_PATTERNS = {
+  pop:    { kick:[0,8],         snare:[4,12], hat:[0,2,4,6,8,10,12,14] },
+  rock:   { kick:[0,6,8,14],    snare:[4,12], hat:[0,2,4,6,8,10,12,14] },
+  jazz:   { kick:[0,8],         snare:[4,12], hat:[0,2,3,4,6,8,10,11,12,14,15] },
+  samba:  { kick:[0,3,6,8,11,14],snare:[4,12], hat:[0,2,4,6,8,10,12,14] },
+  balada: { kick:[0,8],         snare:[12],   hat:[0,4,8,12] },
+};
+
+function scaleSemitone(k) {
+  const iv = SCALES[currentScale];
+  return iv[k % iv.length] + 12 * Math.floor(k / iv.length);
+}
+
+function chordNotesForDegree(deg) {
+  const iv = SCALES[currentScale];
+  return [0,2,4].map(offset => {
+    const k = deg + offset;
+    const oct = currentOctave + Math.floor(k / iv.length);
+    return currentRoot + iv[k % iv.length] + oct * 12 + 12;
+  });
+}
+
+function chordNameForDegree(deg) {
+  const third = scaleSemitone(deg + 2) - scaleSemitone(deg);
+  const fifth = scaleSemitone(deg + 4) - scaleSemitone(deg);
+  let quality = third === 3 ? 'm' : '';
+  if(fifth === 6) quality += '°';
+  else if(fifth === 8) quality += '+';
+  else if(fifth === 9) quality += '9';
+  const root = NOTE_NAMES[(currentRoot + SCALES[currentScale][deg]) % 12];
+  return root + quality;
+}
+
+const CHORD_STEPS = 8;                          // cada acorde dura 8 passos (meio compasso)
+let CHORDS_PER_SECTION = phraseSteps / CHORD_STEPS; // acompanha o tamanho da frase
+
+function pickProgression(count) {
+  const n = count || CHORDS_PER_SECTION;
+  const len = SCALES[currentScale].length;
+  const majorish = ['major','lydian','mixolydian','pentatonic_major'].includes(currentScale);
+  const pools = majorish
+    ? [[0,4,5,3],[0,5,3,4],[0,3,4,4],[0,4,3,5],[0,5,4,3]]  // I V vi IV etc.
+    : [[0,5,2,6],[0,3,6,2],[0,6,5,0],[0,2,5,6],[0,5,3,4]]; // i VI III VII etc.
+  const valid = pools.filter(p => p.every(d => d < len));
+  const cycle = (valid.length ? pickRandom(valid) : [0, 2]).slice();
+  const out = [];
+  for(let i = 0; i < n; i++) {
+    if(i > 0 && i % cycle.length === 0) {
+      // frase longa: gira o ciclo no próximo compasso para não soar mecânico
+      const shift = 1 + Math.floor(Math.random() * Math.max(1, cycle.length - 1));
+      cycle.push(...cycle.splice(0, shift));
+    }
+    out.push(cycle[i % cycle.length]);
+  }
+  if(n > cycle.length) out[n - 1] = 0; // resolução na tônica
+  return out;
+}
+
+function buildBassLine(chords, style) {
+  const pat = BASS_PATTERNS[style] || BASS_PATTERNS.pop;
+  const bass = new Array(phraseSteps).fill(null);
+  for(let bar = 0; bar < barCount(); bar++) {
+    pat.forEach((step, i) => {
+      const abs = bar * BAR_STEPS + step;
+      if(abs >= phraseSteps) return;
+      const chord = chords[Math.floor(abs / CHORD_STEPS)] || chords[0];
+      if(!chord) return;
+      const useFifth = i % 4 === 3 && Math.random() < 0.5;
+      const note = (useFifth && chord.notes[2] !== undefined) ? chord.notes[2] : chord.notes[0];
+      bass[abs] = note - 12;
+    });
+  }
+  return bass;
+}
+
+// Formas de música: V = strofe (verso), R = refrão, P = ponte
+const SONG_FORMS = {
+  simple: [['Strofe 1','verse'], ['Refrão','chorus'], ['Strofe 2','verse'], ['Refrão','chorus']],
+  pop:    [['Strofe 1','verse'], ['Refrão','chorus'], ['Strofe 2','verse'],
+           ['Refrão','chorus'], ['Ponte','bridge'], ['Refrão','chorus']],
+  long:   [['Strofe 1','verse'], ['Refrão','chorus'], ['Strofe 2','verse'],
+           ['Refrão','chorus'], ['Strofe 3','verse'], ['Refrão','chorus'], ['Refrão','chorus']],
+};
+
+function buildDrumPattern(style, light) {
+  const p = DRUM_PATTERNS[style] || DRUM_PATTERNS.pop;
+  const hats = light ? p.hat.filter((_, i) => i % 4 === 0) : p.hat; // strofes mais tranquilas
+  const out = {
+    kick:  new Array(phraseSteps).fill(false),
+    snare: new Array(phraseSteps).fill(false),
+    hat:   new Array(phraseSteps).fill(false),
+  };
+  for(let bar = 0; bar < barCount(); bar++) {
+    const base = bar * BAR_STEPS;
+    [['kick', p.kick], ['snare', p.snare], ['hat', hats]].forEach(([kind, list]) => {
+      list.forEach(i => {
+        const abs = base + i;
+        if(abs < phraseSteps) out[kind][abs] = true;
+      });
+    });
+  }
+  return out;
+}
+
+function makeChordsFromDegrees(degrees) {
+  return degrees.map(d => ({ degree:d, name:chordNameForDegree(d), notes:chordNotesForDegree(d) }));
+}
+
+function melodyToDegrees(melody, extended) {
+  return melody.map(m => {
+    if(m === null || m === undefined) return null;
+    const d = extended.indexOf(m);
+    return d < 0 ? 0 : d;
+  });
+}
+
+function degreesToMelody(degs, extended) {
+  return degs.map(d => (d === null || d === undefined) ? null : extended[d]);
+}
+
+const CONTOUR_LABELS = { arch:'arco ⌢', ascending:'subida ↗', descending:'descida ↘', wave:'ondulado ~' };
+const RHYTHM_LABELS = {
+  straight:'direto', syncopated:'sincopado', waltz:'valsa', latin:'latino',
+  dotted:'pontuado', sparse:'esparso', dense:'denso', offbeat:'contratempo', euclidean53:'euclidiano',
+  halfNotes:'meias notas', threeQuarters:'tempos com respiro',
+};
+
+function singableSemitone(d) {
+  const iv = SCALES[currentScale];
+  return iv[d % iv.length] + 12 * Math.floor(d / iv.length);
+}
+
+// Mantém a linha dentro do conjunto cantável e limita cada salto a uma
+// terça (modo muito fácil) ou quarta (modo fácil).
+function smoothSingableDegrees(degs, extended, level) {
+  const allowed = singableDegrees(extended.length, level);
+  const maxLeap = level === 'veryEasy' ? 4 : 5;
+  const closest = (list, target) => list.reduce((a, b) =>
+    Math.abs(singableSemitone(a) - singableSemitone(target)) <= Math.abs(singableSemitone(b) - singableSemitone(target)) ? a : b,
+    list[0]);
+  let prev = null;
+  return degs.map(d => {
+    if(d === null || d === undefined) return d;
+    let deg = nearestDegree(allowed, d);
+    if(prev !== null && Math.abs(singableSemitone(deg) - singableSemitone(prev)) > maxLeap) {
+      const near = allowed.filter(c => Math.abs(singableSemitone(c) - singableSemitone(prev)) <= maxLeap);
+      if(near.length) deg = closest(near, deg);
+    }
+    prev = deg;
+    return deg;
+  });
+}
+
+// Garante tempo forte no início e cadência na tônica mais próxima.
+// No modo vocal, todas as notas ficam dentro do conjunto cantável.
+function finishVerseDegrees(degs, extended) {
+  const scaleNotes = getScaleDegreeNotes();
+  const maxDeg = extended.length - 1;
+  const allowed = vocalStyle === 'free' ? null : singableDegrees(extended.length, vocalStyle);
+  if(allowed) degs = smoothSingableDegrees(degs, extended, vocalStyle);
+  const tonicDegs = (allowed || Array.from({length:maxDeg + 1}, (_, i) => i))
+    .filter(d => d === 0 || d === scaleNotes.length);
+  if(!tonicDegs.length) tonicDegs.push(0);
+  if(degs[0] === null) degs[0] = pickRandom(tonicDegs);
+  const last = degs.reduce((acc, d, i) => d === null ? acc : i, 0);
+  const prev = degs.slice(0, last).reduce((acc, d, i) => d === null ? acc : i, 0);
+  degs[last] = nearestDegree(tonicDegs, degs[prev] === null ? 0 : degs[prev]);
+  return degs;
+}
+
+// Agrupa as notas ativas de qualquer melodia por compasso.
+function barsOfMelody(melody) {
+  const out = Array.from({length: barCount()}, () => []);
+  melody.forEach((m, i) => {
+    if(m === null || m === undefined) return;
+    const b = Math.floor(i / BAR_STEPS);
+    if(out[b]) out[b].push(i);
+  });
+  return out;
+}
+
+// Variação da estrofe feita com os mesmos mecanismos dos botões 📈 Contorno,
+// 🎲 Ritmo Aleat. e 🔗 Combinar: o resultado fica guardado na música.
+function makeVerse(chorusMelody) {
+  const scaleNotes = getScaleDegreeNotes();
+  const extended = [...scaleNotes, scaleNotes[0] + 12];
+  const chorusDegs = melodyToDegrees(chorusMelody, extended);
+  const activeSteps = chorusDegs.map((d, i) => d === null ? -1 : i).filter(i => i >= 0);
+  const sourceDegs = activeSteps.map(i => chorusDegs[i]);
+  if(!sourceDegs.length) sourceDegs.push(0);
+
+  const roll = Math.random();
+  if(roll < 0.4) {
+    // Mesmo ritmo do refrão, nova linha melódica — exatamente como "📈 Contorno".
+    const contour = pickRandom(CONTOURS);
+    const degs = buildMelodyDegreePath(contour, activeSteps, extended);
+    if(Math.random() < 0.6) degs[activeSteps[0]] = sourceDegs[0]; // âncora do tema
+    return {
+      melody: degreesToMelody(finishVerseDegrees(degs, extended), extended),
+      variation: `contorno ${CONTOUR_LABELS[contour] || contour}`,
+    };
+  }
+
+  if(roll < 0.7 && barCount() > 1) {
+    // Reagrupa os compassos do tema em outra forma de frase (A–A′–B–A′ etc.).
+    const bars = barsOfMelody(chorusMelody);
+    const seqs = bars.map(idxs => idxs.map(i => {
+      const d = extended.indexOf(chorusMelody[i]);
+      return d < 0 ? 0 : d;
+    }));
+    const arranged = arrangePhrase(seqs, bars, extended, pickRandom(CONTOURS));
+    const degs = new Array(phraseSteps).fill(null);
+    bars.forEach((idxs, b) => idxs.forEach((abs, k) => { degs[abs] = arranged[b][k]; }));
+    return {
+      melody: degreesToMelody(finishVerseDegrees(degs, extended), extended),
+      variation: 'compassos do tema reagrupados',
+    };
+  }
+
+  // Mesmas alturas do refrão, nova posição das notas — como "🎲 Ritmo Aleat.".
+  const pool = vocalStyle === 'free'
+    ? Object.keys(RHYTHM_PATTERNS)
+    : SINGABLE_RHYTHM_NAMES.filter(name => RHYTHM_PATTERNS[name]);
+  const name = pickRandom(pool.length ? pool : Object.keys(RHYTHM_PATTERNS));
+  const pattern = RHYTHM_PATTERNS[name];
+  const active = [];
+  for(let b = 0; b < barCount(); b++) {
+    pattern.forEach((on, i) => { if(on) active.push(b * BAR_STEPS + i); });
+  }
+  let degs;
+  if(vocalStyle === 'free') {
+    degs = new Array(phraseSteps).fill(null);
+    let k = 0;
+    active.forEach(i => { degs[i] = sourceDegs[k % sourceDegs.length]; k++; });
+  } else {
+    degs = buildSingableDegreePath(pickRandom(CONTOURS), active, extended, vocalStyle);
+  }
+  return {
+    melody: degreesToMelody(finishVerseDegrees(degs, extended), extended),
+    variation: `ritmo ${RHYTHM_LABELS[name] || name}`,
+  };
+}
+
+// Ponte: contrasta com o refrão e termina na dominante, puxando o refrão final.
+// No modo vocal, a inversão é limitada ao conjunto cantável.
+function makeBridge(chorusMelody) {
+  const scaleNotes = getScaleDegreeNotes();
+  const extended = [...scaleNotes, scaleNotes[0] + 12];
+  const maxDeg = extended.length - 1;
+  const allowed = vocalStyle === 'free' ? null : singableDegrees(extended.length, vocalStyle);
+  let degs = melodyToDegrees(chorusMelody, extended)
+    .map((d, i) => (d === null || (i % 4 !== 0 && Math.random() < 0.5)) ? null : maxDeg - d);
+  if(degs[0] === null) degs[0] = 0;
+  if(allowed) degs = smoothSingableDegrees(degs, extended, vocalStyle);
+  const last = degs.reduce((acc, d, i) => d === null ? acc : i, 0);
+  const prev = degs.slice(0, last).reduce((acc, d, i) => d === null ? acc : i, 0);
+  const domPool = allowed || Array.from({length:maxDeg + 1}, (_, i) => i);
+  const dom = nearestDegree(domPool, dominantDegree(maxDeg));
+  degs[last] = dom;
+  if(allowed) {
+    const maxLeap = vocalStyle === 'veryEasy' ? 4 : 5;
+    if(Math.abs(singableSemitone(dom) - singableSemitone(degs[prev])) > maxLeap) {
+      const near = allowed.filter(d => Math.abs(singableSemitone(d) - singableSemitone(degs[prev])) <= maxLeap);
+      if(near.length) degs[last] = near.reduce((a, b) =>
+        Math.abs(singableSemitone(a) - singableSemitone(dom)) <= Math.abs(singableSemitone(b) - singableSemitone(dom)) ? a : b,
+        near[0]);
+    }
+  }
+  return degreesToMelody(degs, extended);
+}
+
+function progressionFor(type, chorusProg) {
+  if(type === 'chorus') return chorusProg.slice();
+  if(type === 'bridge') {
+    const p = pickProgression();
+    p[p.length - 1] = dominantDegree(SCALES[currentScale].length - 1);
+    return p;
+  }
+  let p = pickProgression();
+  if(p.join() === chorusProg.join()) p = p.slice().reverse(); // strofe não repete o refrão
+  return p;
+}
+
+// Reconstroi a música quando a melodia muda (evita recursão ao gerar do zero).
+function syncArrangement() { if(arrangement) buildFullSong(); }
+
+function buildFullSong() {
+  if(steps.every(s => s === null)) { arrangement = null; generateMelody(); }
+  const style = document.getElementById('arrangementStyle').value;
+  const formId = document.getElementById('songForm').value;
+  const form = SONG_FORMS[formId] || SONG_FORMS.pop;
+  const chorusMelody = steps.slice();
+  const chorusDegrees = pickProgression();
+  const chorusChords = makeChordsFromDegrees(chorusDegrees);
+
+  arrangement = {
+    style,
+    form: formId,
+    chords: chorusChords,                       // legado / resumo (progressão do refrão)
+    bass: buildBassLine(chorusChords, style),
+    drums: buildDrumPattern(style, false),
+    sections: form.map(([name, type]) => {
+      const chords = makeChordsFromDegrees(progressionFor(type, chorusDegrees));
+      const made = type === 'chorus'
+        ? { melody: chorusMelody.slice(), variation: 'tema original' }
+        : type === 'bridge'
+          ? { melody: makeBridge(chorusMelody), variation: 'inversão → dominante' }
+          : makeVerse(chorusMelody);
+      return {
+        name, type,
+        melody: made.melody,
+        variation: made.variation,
+        chords,
+        bass: buildBassLine(chords, style),
+        drums: buildDrumPattern(style, type !== 'chorus'),
+      };
+    }),
+  };
+  currentSection = 0;
+  renderedSectionIndex = -1;
+  arrangementEnabled = true;
+  updateArrangementButtons();
+  renderArrangement();
+}
+
+function toggleArrangement() {
+  if(!arrangement) { buildFullSong(); return; }
+  arrangementEnabled = !arrangementEnabled;
+  updateArrangementButtons();
+}
+
+function updateArrangementButtons() {
+  const btn = document.getElementById('btnArrangement');
+  btn.textContent = arrangementEnabled ? '🎚 Música: ligada' : '🎚 Música: desligada';
+  btn.className = 'btn ' + (arrangementEnabled ? 'btn-success' : 'btn-outline');
+}
+
+function changeArrangementStyle() { if(arrangement) buildFullSong(); }
+function changeSongForm() { if(arrangement) buildFullSong(); }
+
+// Sorteia novas variações para as estrofes/ponte e as guarda na música.
+// O refrão (tema original) permanece intacto.
+function regenerateVariations() {
+  if(!arrangement) { buildFullSong(); return; }
+  const chorus = arrangement.sections.find(s => s.type === 'chorus');
+  const theme = chorus ? chorus.melody.slice() : steps.slice();
+  arrangement.sections.forEach(sec => {
+    if(sec.type === 'chorus') return;
+    const made = sec.type === 'bridge'
+      ? { melody: makeBridge(theme), variation: 'inversão → dominante' }
+      : makeVerse(theme);
+    sec.melody = made.melody;
+    sec.variation = made.variation;
+  });
+  renderedSectionIndex = -1;
+  renderArrangement();
+}
+
+function selectSection(i) {
+  currentSection = i;
+  renderedSectionIndex = -1;
+  renderArrangement();
+}
+
+function renderArrangement() {
+  const panel = document.getElementById('arrangementPanel');
+  if(!arrangement) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  renderSongFormStrip();
+  renderSectionDetail(currentSection);
+}
+
+function renderSongFormStrip() {
+  const strip = document.getElementById('songFormStrip');
+  strip.innerHTML = '';
+  arrangement.sections.forEach((sec, i) => {
+    const chip = document.createElement('span');
+    chip.className = `section-chip ${sec.type}${i === currentSection ? ' active' : ''}`;
+    chip.textContent = `${i+1}. ${sec.name}`;
+    chip.title = sec.variation || '';
+    chip.onclick = () => selectSection(i);
+    strip.appendChild(chip);
+  });
+}
+
+function renderSectionDetail(i) {
+  const sec = arrangement.sections[i];
+  if(!sec) return;
+  const typeName = sec.type === 'chorus' ? 'Refrão' : sec.type === 'bridge' ? 'Ponte' : 'Strofe';
+  const variation = sec.variation ? ` · variação: ${sec.variation}` : '';
+  document.getElementById('sectionTitle').textContent = `${i+1}. ${sec.name} · ${typeName}${variation}`;
+  document.getElementById('progressionDisplay').innerHTML = sec.chords
+    .map((c, j) => `<span class="badge badge-purple">${j+1}. ${c.name}</span>`).join('');
+
+  const chordRow = new Array(phraseSteps).fill(null);
+  sec.chords.forEach((c, j) => { chordRow[j * CHORD_STEPS] = c.name; });
+  const rows = [
+    ['Acordes', chordRow, 'chord'],
+    ['Baixo',   sec.bass.map(m => m === null ? null : NOTE_NAMES[m % 12]), 'bass'],
+    ['Kick',    sec.drums.kick.map(v => v ? '●' : null), 'kick'],
+    ['Snare',   sec.drums.snare.map(v => v ? '●' : null), 'snare'],
+    ['Hi-hat',  sec.drums.hat.map(v => v ? '●' : null), 'hat'],
+    ['Melodia', sec.melody.map(m => m === null ? null : NOTE_NAMES[m % 12]), 'melody'],
+  ];
+
+  const grid = document.getElementById('arrangementGrid');
+  grid.innerHTML = '';
+  rows.forEach(([label, values, cls]) => {
+    const row = document.createElement('div');
+    row.className = 'arr-row';
+    const lbl = document.createElement('div');
+    lbl.className = 'arr-label';
+    lbl.textContent = label;
+    const cells = document.createElement('div');
+    cells.className = 'arr-cells';
+    values.forEach((value, j) => {
+      const cell = document.createElement('div');
+      cell.className = `arr-cell ${cls}${value !== null ? ' on' : ''}${j % BAR_STEPS === 0 ? ' barStart' : ''}`;
+      cell.dataset.step = j;
+      if(value !== null) cell.textContent = value;
+      cells.appendChild(cell);
+    });
+    row.appendChild(lbl);
+    row.appendChild(cells);
+    grid.appendChild(row);
+  });
+  renderedSectionIndex = i;
+}
+
+// =====================================================================
+// RHYTHM PATTERNS
+// =====================================================================
+function euclidean(pulses, total) {
+  const pattern = new Array(total).fill(0);
+  let bucket = 0;
+  for(let i = 0; i < total; i++) {
+    bucket += pulses;
+    if(bucket >= total) { bucket -= total; pattern[i] = 1; }
+  }
+  return pattern;
+}
+
+const RHYTHM_PATTERNS = {
+  straight:    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  syncopated:  [1,0,1,1,0,1,0,1,1,0,1,1,0,1,0,0],
+  waltz:       [1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1],
+  latin:       [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],
+  dotted:      [1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1],
+  sparse:      [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+  dense:       [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  offbeat:     [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
+  euclidean53: euclidean(5, BAR_STEPS),
+  halfNotes:   [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+  threeQuarters:[1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0],
+};
+
+function applyRhythmPattern(name) {
+  const pattern = RHYTHM_PATTERNS[name];
+  if(!pattern) return;
+
+  const scaleNotes = getScaleDegreeNotes();
+  const extended = [...scaleNotes, scaleNotes[0] + 12];
+  const allowed = vocalStyle === 'free' ? null : singableDegrees(extended.length, vocalStyle);
+  const chordDegs = (allowed || chordDegrees()).filter(d => d < extended.length);
+  const allDegs = allowed || extended.map((_, i) => i);
+
+  for(let b = 0; b < barCount(); b++) {
+    pattern.forEach((on, i) => {
+      const pos = b * BAR_STEPS + i;
+      if(pos >= phraseSteps) return;
+      if(!on) {
+        steps[pos] = null;
+      } else if(steps[pos] === null) {
+        steps[pos] = extended[pickRandom(i % 4 === 0 ? chordDegs : allDegs)];
+      } else if(allowed) {
+        const idx = extended.indexOf(steps[pos]);
+        if(idx >= 0) steps[pos] = extended[nearestDegree(allowed, idx)];
+      }
+    });
+  }
+
+  buildSequencerGrid();
+  syncArrangement();
+}
+
+function randomizeRhythm() {
+  const names = vocalStyle === 'free'
+    ? Object.keys(RHYTHM_PATTERNS)
+    : SINGABLE_RHYTHM_NAMES.filter(name => RHYTHM_PATTERNS[name]);
+  applyRhythmPattern(pickRandom(names.length ? names : Object.keys(RHYTHM_PATTERNS)));
+}
+
+function applyContour() {
+  const activeIdxs = steps.map((s, i) => s !== null ? i : -1).filter(i => i >= 0);
+  if(activeIdxs.length === 0) { generateMelody(); return; }
+
+  const scaleNotes = getScaleDegreeNotes();
+  const extended = [...scaleNotes, scaleNotes[0] + 12];
+  const degrees = buildMelodyDegreePath(pickRandom(CONTOURS), activeIdxs, extended);
+
+  activeIdxs.forEach(step => { steps[step] = extended[degrees[step]]; });
+  buildSequencerGrid();
+  syncArrangement();
+}
+
+// =====================================================================
+// DISPLAY UPDATES
+// =====================================================================
+function updateMelodyDisplay() {
+  const wrap = document.getElementById('melodySequence');
+  wrap.innerHTML = '';
+  steps.forEach(m => {
+    const pill = document.createElement('span');
+    if(m === null) {
+      pill.className = 'note-pill rest';
+      pill.textContent = '—';
+    } else {
+      pill.className = 'note-pill';
+      pill.textContent = NOTE_NAMES[m % 12];
+    }
+    wrap.appendChild(pill);
+  });
+}
+
+function updateContour() {
+  const canvas = document.getElementById('contourCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const activeMidis = steps.filter(s => s !== null);
+  if(activeMidis.length < 2) return;
+
+  const minMidi = Math.min(...activeMidis);
+  const maxMidi = Math.max(...activeMidis);
+  const range = maxMidi - minMidi || 1;
+
+  // Grid
+  ctx.strokeStyle = '#1e2a3a';
+  ctx.lineWidth = 1;
+  for(let y = 0; y <= 4; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, (y/4)*H);
+    ctx.lineTo(W, (y/4)*H);
+    ctx.stroke();
+  }
+
+  // Bar lines
+  ctx.strokeStyle = '#334155';
+  for(let b = 1; b < barCount(); b++) {
+    const x = (b * BAR_STEPS / Math.max(phraseSteps - 1, 1)) * (W - 24) + 12;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+
+  // Build points
+  const points = [];
+  steps.forEach((midi, si) => {
+    if(midi !== null) {
+      const x = (si / Math.max(phraseSteps - 1, 1)) * (W - 24) + 12;
+      const y = H - 15 - ((midi - minMidi) / range) * (H - 30);
+      points.push({x, y, midi});
+    }
+  });
+
+  if(points.length < 2) return;
+
+  // Fill area
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, H);
+  ctx.lineTo(points[0].x, points[0].y);
+  for(let i = 1; i < points.length; i++) {
+    const cpx = (points[i-1].x + points[i].x) / 2;
+    ctx.bezierCurveTo(cpx, points[i-1].y, cpx, points[i].y, points[i].x, points[i].y);
+  }
+  ctx.lineTo(points[points.length-1].x, H);
+  ctx.closePath();
+  const fillGrad = ctx.createLinearGradient(0, 0, 0, H);
+  fillGrad.addColorStop(0, 'rgba(59,130,246,0.25)');
+  fillGrad.addColorStop(1, 'rgba(59,130,246,0)');
+  ctx.fillStyle = fillGrad;
+  ctx.fill();
+
+  // Line
+  const lineGrad = ctx.createLinearGradient(0, 0, W, 0);
+  lineGrad.addColorStop(0, '#3b82f6');
+  lineGrad.addColorStop(0.5, '#8b5cf6');
+  lineGrad.addColorStop(1, '#10b981');
+  ctx.strokeStyle = lineGrad;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    if(i === 0) ctx.moveTo(p.x, p.y);
+    else {
+      const cpx = (points[i-1].x + p.x) / 2;
+      ctx.bezierCurveTo(cpx, points[i-1].y, cpx, p.y, p.x, p.y);
+    }
+  });
+  ctx.stroke();
+
+  // Dots + labels
+  points.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+    ctx.strokeStyle = '#1d4ed8';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '10px monospace';
+    ctx.fillText(NOTE_NAMES[p.midi % 12], p.x - 5, p.y - 9);
+  });
+}
+
+function updateAnalysis() {
+  const wrap = document.getElementById('melodyAnalysis');
+  const activeMidis = steps.filter(s => s !== null);
+  if(activeMidis.length === 0) {
+    wrap.innerHTML = '<p class="text-slate-500 text-xs">Adicione notas para ver a análise...</p>';
+    return;
+  }
+
+  const noteCount = activeMidis.length;
+  const restCount = steps.filter(s => s === null).length;
+  const noteSet = new Set(activeMidis.map(m => NOTE_NAMES[m%12]));
+  const minMidi = Math.min(...activeMidis);
+  const maxMidi = Math.max(...activeMidis);
+  const range = maxMidi - minMidi;
+
+  const intervals = [];
+  for(let i = 1; i < activeMidis.length; i++) {
+    intervals.push(Math.abs(activeMidis[i] - activeMidis[i-1]));
+  }
+  const avgInterval = intervals.length > 0 ? (intervals.reduce((a,b)=>a+b,0)/intervals.length).toFixed(1) : 0;
+  const hasLeaps = intervals.some(i => i > 4);
+
+  const notesPerBar = noteCount / barCount();
+  const density = (noteCount / phraseSteps * 100).toFixed(0);
+  const lastNote = activeMidis[activeMidis.length - 1];
+  const endsOnTonic = lastNote % 12 === currentRoot;
+
+  // Índice de cantabilidade: âmbito, movimento, densidade e variedade de notas.
+  const avgNum = parseFloat(avgInterval);
+  const singScore =
+    (range <= 7 ? 25 : range <= 9 ? 20 : range <= 12 ? 12 : 4) +
+    (avgNum <= 1.5 ? 25 : avgNum <= 2.5 ? 20 : avgNum <= 3.5 ? 12 : 5) +
+    (notesPerBar <= 4 ? 20 : notesPerBar <= 6 ? 16 : notesPerBar <= 8 ? 10 : 4) +
+    (noteSet.size <= 4 ? 15 : noteSet.size <= 5 ? 12 : noteSet.size <= 7 ? 8 : 4) +
+    (endsOnTonic ? 15 : 0);
+  const singLabel = singScore >= 95 ? '✅ Muito fácil' : singScore >= 80 ? '🙂 Cantável'
+    : singScore >= 60 ? '⚖️ Moderada' : '⚡ Desafiadora';
+  const avgDuration = phraseSteps / noteCount;
+
+  wrap.innerHTML = `
+    <div class="flex flex-wrap gap-2">
+      <span class="badge badge-blue">🎵 ${noteCount} notas</span>
+      <span class="badge badge-green">🔇 ${restCount} pausas</span>
+      <span class="badge badge-yellow">📊 ${density}% denso</span>
+      <span class="badge badge-purple">🎤 ${singScore}/100 · ${singLabel}</span>
+    </div>
+    <div class="text-xs space-y-1 mt-2">
+      <div class="flex gap-2"><span class="text-slate-500">Âmbito:</span><span>${range} st (${NOTE_NAMES[minMidi%12]}→${NOTE_NAMES[maxMidi%12]})</span></div>
+      <div class="flex gap-2"><span class="text-slate-500">Intervalo médio:</span><span>${avgInterval} st — ${avgNum<=2?'✅ Conjunct (suave)':avgNum>4?'⚡ Muitos saltos':'⚖️ Equilibrado'}</span></div>
+      <div class="flex gap-2"><span class="text-slate-500">Duração média:</span><span>${avgDuration.toFixed(1)} passos (${(avgDuration/4).toFixed(1)} tempos)</span></div>
+      <div class="flex gap-2"><span class="text-slate-500">Notas usadas:</span><span>${[...noteSet].join(', ')}</span></div>
+      <div class="flex gap-2"><span class="text-slate-500">Tônica no fim:</span><span>${endsOnTonic ? '✅ Resolve bem' : '⚠️ Pode soar inconcluso'}</span></div>
+      ${hasLeaps ? '<div class="text-yellow-400">💡 Após saltos grandes, resolva por grau conjunto no sentido oposto.</div>' : ''}
+    </div>
+  `;
+}
+
+function clearSequencer() {
+  steps = new Array(phraseSteps).fill(null);
+  arrangement = null;
+  arrangementEnabled = false;
+  currentSection = 0;
+  renderedSectionIndex = -1;
+  updateArrangementButtons();
+  renderArrangement();
+  buildSequencerGrid();
+}
+
+// =====================================================================
+// EXPORT
+// =====================================================================
+function updateCompositionSummary() {
+  const root = document.getElementById('rootNote').value;
+  const scale = document.getElementById('scaleType').value;
+  const noteCount = steps.filter(s => s !== null).length;
+  document.getElementById('compositionSummary').innerHTML = `
+    <div><span class="text-slate-500">Tonalidade:</span> <strong>${root} ${scale.replace(/_/g,' ')}</strong></div>
+    <div><span class="text-slate-500">Instrumento:</span> <strong>${getInstrument().name}</strong></div>
+    <div><span class="text-slate-500">Voz:</span> <strong>${VOCAL_LABELS[vocalStyle]}</strong></div>
+    <div><span class="text-slate-500">Tempo:</span> <strong>${bpm} BPM</strong></div>
+    <div><span class="text-slate-500">Compasso:</span> <strong>${timeSig}/4</strong></div>
+    <div><span class="text-slate-500">Frase:</span> <strong>${barCount()} compasso${barCount() === 1 ? '' : 's'} · ${phraseSteps} passos</strong></div>
+    <div><span class="text-slate-500">Notas ativas:</span> <strong>${noteCount} / ${phraseSteps} passos</strong></div>
+    <div><span class="text-slate-500">Forma:</span> <strong>${arrangement ? arrangement.sections.map(s => s.name).join(' → ') : 'não criada'}</strong></div>
+    <div><span class="text-slate-500">Arranjo:</span> <strong>${arrangement ? arrangement.chords.map(c => c.name).join(' – ') + ' (' + arrangement.style + ')' : 'não criado'}</strong></div>
+    <div><span class="text-slate-500">Emoção:</span> <strong>${SCALE_EMOTIONS[scale]?.text}</strong></div>
+  `;
+}
+
+function exportJSON() {
+  const root = document.getElementById('rootNote').value;
+  const scale = document.getElementById('scaleType').value;
+  const data = { root, scale, instrument: currentInstrument, vocalStyle, bpm, timeSig,
+    phraseSteps, barSteps: BAR_STEPS, bars: barCount(),
+    steps: steps.map((midi, i) => ({ step: i, midi, note: midi ? midiToNoteName(midi) : null })),
+    arrangement: arrangement ? {
+      style: arrangement.style,
+      form: arrangement.form,
+      enabled: arrangementEnabled,
+      progression: arrangement.chords.map(c => c.name),
+      chords: arrangement.chords.map(c => c.notes),
+      bass: arrangement.bass,
+      drums: arrangement.drums,
+      sections: arrangement.sections.map(s => ({
+        name: s.name,
+        type: s.type,
+        variation: s.variation,
+        melody: s.melody.map(m => m === null ? null : midiToNoteName(m)),
+        midi: s.melody,
+        chords: s.chords.map(c => c.name),
+        chordMidi: s.chords.map(c => c.notes),
+        bass: s.bass,
+        drums: s.drums,
+      })),
+    } : null
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `melody-${root}-${scale}.json`;
+  a.click();
+}
+
+function exportTablature() {
+  const root = document.getElementById('rootNote').value;
+  const scale = document.getElementById('scaleType').value;
+  const intervals = SCALES[scale];
+
+  let tab = `MelodyForge — ${root} ${scale.replace(/_/g,' ')} @ ${bpm} BPM\n`;
+  tab += '═'.repeat(60) + '\n\n';
+  tab += `Frase: ${barCount()} compasso${barCount() === 1 ? '' : 's'} (${phraseSteps} passos)\n`;
+  tab += 'Passo:  ';
+  for(let i = 0; i < phraseSteps; i++) tab += (i+1).toString().padStart(3,' ');
+  tab += '\nNota:   ';
+  steps.forEach(m => { tab += (m ? NOTE_NAMES[m%12] : '—').padStart(3,' '); });
+  tab += '\nMIDI:   ';
+  steps.forEach(m => { tab += (m ? m.toString() : '—').padStart(3,' '); });
+  if(arrangement) {
+    tab += '\nAcordes (refrão):';
+    arrangement.chords.forEach((c, i) => { tab += ` ${i+1}:${c.name}`; });
+    tab += '\n\n===== FORMA: ' + arrangement.sections.map(s => s.name).join(' → ') + ' =====';
+    arrangement.sections.forEach((sec, si) => {
+      const typeName = sec.type === 'chorus' ? 'Refrão' : sec.type === 'bridge' ? 'Ponte' : 'Strofe';
+      tab += `\n\n[${si+1}] ${sec.name} (${typeName})${sec.variation ? ' — variação: ' + sec.variation : ''}`;
+      tab += '\n  Acordes: ' + sec.chords.map((c, j) => `${j+1}:${c.name}`).join(' ');
+      tab += '\n  Melodia: ';
+      sec.melody.forEach(m => { tab += (m ? NOTE_NAMES[m%12] : '—').padStart(3,' '); });
+      tab += '\n  Baixo:   ';
+      sec.bass.forEach(m => { tab += (m ? NOTE_NAMES[m%12] : '—').padStart(3,' '); });
+    });
+  }
+  tab += '\n\nTempo:  ';
+  for(let i = 0; i < phraseSteps; i++) tab += ['1','e','+','a'][i%4].padStart(3,' ');
+  tab += '\n        ';
+  tab += steps.map(m => m ? '■  ' : '·  ').join('');
+  tab += '\n\n';
+  tab += `Escala ${root} ${scale.replace(/_/g,' ')}: ${intervals.map(i => NOTE_NAMES[(currentRoot+i)%12]).join(' - ')}\n`;
+
+  document.getElementById('tabDisplay').textContent = tab;
+
+  // Switch to export tab
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  ['compose','theory','rhythm','export'].forEach(id => document.getElementById('tab-'+id).classList.add('hidden'));
+  document.getElementById('tab-export').classList.remove('hidden');
+  document.querySelectorAll('.tab-btn')[3].classList.add('active');
+  updateCompositionSummary();
+}
+
+function writeVarLen(arr, val) {
+  if(val < 128) { arr.push(val); return; }
+  const bytes = [];
+  bytes.push(val & 0x7F);
+  val >>= 7;
+  while(val > 0) { bytes.push((val & 0x7F) | 0x80); val >>= 7; }
+  for(let i = bytes.length - 1; i >= 0; i--) arr.push(bytes[i]);
+}
+
+function makeMidiTrack(events, initial) {
+  const data = [];
+  (initial || []).forEach(ev => {
+    writeVarLen(data, ev[0]);
+    for(let i = 1; i < ev.length; i++) data.push(ev[i]);
+  });
+  events.sort((a, b) => a[0] - b[0]);
+  let prevTick = 0;
+  events.forEach(ev => {
+    const delta = ev[0] - prevTick;
+    writeVarLen(data, delta);
+    prevTick = ev[0];
+    for(let i = 1; i < ev.length; i++) data.push(ev[i]);
+  });
+  writeVarLen(data, 0);
+  data.push(0xFF, 0x2F, 0x00); // end of track
+  return data;
+}
+
+function exportMIDI() {
+  const ppq = 96;
+  const stepTicks = ppq / 4;
+  const noteTicks = Math.round(stepTicks * 0.82);
+  const tempo = Math.round(60000000 / bpm);
+
+  const melodyEvents = [], chordEvents = [], bassEvents = [], drumEvents = [];
+  const tempoEvent = [0, 0xFF, 0x51, 0x03, (tempo>>16)&0xFF, (tempo>>8)&0xFF, tempo&0xFF];
+  const drumNotes = { kick:36, snare:38, hat:42 };
+  let tracks;
+
+  if(arrangement && arrangementEnabled) {
+    // Exporta a música inteira: cada seção ocupa uma frase na linha do tempo.
+    arrangement.sections.forEach((section, si) => {
+      const base = si * phraseSteps * stepTicks;
+
+      section.melody.forEach((midi, i) => {
+        if(midi === null || midi === undefined) return;
+        const t = base + i * stepTicks;
+        melodyEvents.push([t, 0x90, midi, 80]);          // canal 1
+        melodyEvents.push([t + noteTicks, 0x80, midi, 0]);
+      });
+
+      section.chords.forEach((chord, ci) => {
+        const t = base + ci * CHORD_STEPS * stepTicks;
+        const dur = Math.round(stepTicks * (CHORD_STEPS - 0.4));
+        chord.notes.forEach(midi => {
+          chordEvents.push([t, 0x91, midi, 65]);          // canal 2
+          chordEvents.push([t + dur, 0x81, midi, 0]);
+        });
+      });
+
+      section.bass.forEach((midi, i) => {
+        if(midi === null || midi === undefined) return;
+        const t = base + i * stepTicks;
+        const dur = Math.round(stepTicks * 0.9);
+        bassEvents.push([t, 0x92, midi, 90]);            // canal 3
+        bassEvents.push([t + dur, 0x82, midi, 0]);
+      });
+
+      Object.keys(drumNotes).forEach(kind => {
+        section.drums[kind].forEach((on, i) => {
+          if(!on) return;
+          const t = base + i * stepTicks;
+          drumEvents.push([t, 0x99, drumNotes[kind], kind === 'kick' ? 100 : 70]); // canal 10
+          drumEvents.push([t + 4, 0x89, drumNotes[kind], 0]);
+        });
+      });
+    });
+
+    tracks = [
+      makeMidiTrack(melodyEvents, [tempoEvent]),
+      makeMidiTrack(chordEvents),
+      makeMidiTrack(bassEvents),
+      makeMidiTrack(drumEvents),
+    ];
+  } else {
+    steps.forEach((midi, i) => {
+      if(midi === null || midi === undefined) return;
+      melodyEvents.push([i * stepTicks, 0x90, midi, 80]);
+      melodyEvents.push([i * stepTicks + noteTicks, 0x80, midi, 0]);
+    });
+    tracks = [makeMidiTrack(melodyEvents, [tempoEvent])];
+  }
+
+  const header = [0x4D,0x54,0x68,0x64,0,0,0,6, 0,0, (tracks.length>>8)&0xFF, tracks.length&0xFF, (ppq>>8)&0xFF, ppq&0xFF];
+  const parts = [header];
+  tracks.forEach(data => {
+    const tl = data.length;
+    parts.push([0x4D,0x54,0x72,0x6B,(tl>>24)&0xFF,(tl>>16)&0xFF,(tl>>8)&0xFF,tl&0xFF], data);
+  });
+
+  const bytes = new Uint8Array(parts.flat());
+  const blob = new Blob([bytes], {type:'audio/midi'});
+  const a = document.createElement('a');
+  const root = document.getElementById('rootNote').value;
+  const scale = document.getElementById('scaleType').value;
+  a.href = URL.createObjectURL(blob);
+  a.download = `music-${root}-${scale}-${bpm}bpm.mid`;
+  a.click();
+}
+
+// =====================================================================
+// KEYBOARD SHORTCUTS
+// =====================================================================
+const TAB_IDS = ['compose','theory','rhythm','export'];
+
+function toggleShortcuts() {
+  document.getElementById('shortcutsPanel').classList.toggle('hidden');
+}
+
+function switchTabByIndex(index) {
+  const btn = document.querySelectorAll('.tab-btn')[index];
+  if(btn) switchTab(btn, TAB_IDS[index]);
+}
+
+// Atalhos de ação (não conflitam com as teclas do piano)
+document.addEventListener('keydown', (e) => {
+  if(e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+
+  const el = e.target;
+  if(el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+
+  const key = e.key.toLowerCase();
+
+  switch(key) {
+    case ' ':
+      e.preventDefault();
+      togglePlay();
+      return;
+    case 'n':
+      e.preventDefault();
+      generateMelody();
+      return;
+    case 'l':
+      e.preventDefault();
+      clearSequencer();
+      return;
+    case 'r':
+      e.preventDefault();
+      randomizeRhythm();
+      return;
+    case 'c':
+      e.preventDefault();
+      applyContour();
+      return;
+    case 'm':
+      e.preventDefault();
+      buildFullSong();
+      return;
+    case 'v':
+      e.preventDefault();
+      regenerateVariations();
+      return;
+    case 'b':
+      e.preventDefault();
+      cycleVocalStyle();
+      return;
+    case 'x':
+      e.preventDefault();
+      combineMelody();
+      return;
+    case '1': case '2': case '3': case '4':
+      e.preventDefault();
+      switchTabByIndex(parseInt(key) - 1);
+      return;
+    case '?':
+      e.preventDefault();
+      toggleShortcuts();
+      return;
+    case '[': case ']':
+      e.preventDefault();
+      cycleInstrument(key === ']' ? 1 : -1);
+      return;
+  }
+
+  // Piano virtual: toca a nota correspondente à tecla
+  if(Object.prototype.hasOwnProperty.call(PIANO_KEY_MAP, key)) {
+    e.preventDefault();
+    const midi = PIANO_KEY_MAP[key] + (e.shiftKey ? 12 : 0);
+    pressedPianoKeys.set(key, midi);
+    playNoteInteractive(midi);
+    pressKeyVisual(midi);
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  const key = e.key.toLowerCase();
+  if(!pressedPianoKeys.has(key)) return;
+  const midi = pressedPianoKeys.get(key);
+  pressedPianoKeys.delete(key);
+  stopNote(midi);
+  releaseKeyVisual(midi);
+});
+
+// Solta todas as notas se a janela perder o foco
+window.addEventListener('blur', () => {
+  pressedPianoKeys.forEach(midi => { stopNote(midi); releaseKeyVisual(midi); });
+  pressedPianoKeys.clear();
+});
+
+// =====================================================================
+// INIT
+// =====================================================================
+function init() {
+  const phraseSel = document.getElementById('phraseLength');
+  setPhraseSteps(phraseSel ? (parseInt(phraseSel.value) || 64) : 64);
+  buildInstrumentSelect();
+  updateArrangementButtons();
+  buildPiano();
+  buildSequencerGrid();
+  updateVocalHint();
+  updateScaleDisplay();
+  updateTimeSig();
+}
+
+init();
+</script>
+</body>
+</html>
